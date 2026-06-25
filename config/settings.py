@@ -34,7 +34,7 @@ CSRF_TRUSTED_ORIGINS = []
 environment = os.getenv("ENVIRONMENT")
 if environment:
     ALLOWED_HOSTS.append(f"pm-roadmap.{environment}.cdp-int.defra.cloud")
-    ALLOWED_HOSTS.append("localhost:8085") # container health check
+    ALLOWED_HOSTS.append('localhost') # container health check
     CSRF_TRUSTED_ORIGINS.append(f"https://pm-roadmap.{environment}.cdp-int.defra.cloud")
 
 # Application definition
