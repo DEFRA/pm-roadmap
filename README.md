@@ -1,221 +1,145 @@
-# pm-roadmap
+# Roadmap (Django)
 
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=DEFRA_pm-roadmap&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=DEFRA_pm-roadmap)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=DEFRA_pm-roadmap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=DEFRA_pm-roadmap)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DEFRA_pm-roadmap&metric=coverage)](https://sonarcloud.io/summary/new_code?id=DEFRA_pm-roadmap)
+A roadmap visualisation tool for planning and communicating delivery across
+objectives, outcomes, and teams. Built with Django + SQLite, server-rendered
+with Alpine.js for in-page interactivity.
 
-Core delivery platform Node.js Frontend Template.
+This is the **Django proof of concept**. A separate Node.js/Express rebuild
+exists; this app has been brought up to the same feature scope.
 
-- [Requirements](#requirements)
-  - [Node.js](#nodejs)
-- [Server-side Caching](#server-side-caching)
-- [Redis](#redis)
-- [Local Development](#local-development)
-  - [Setup](#setup)
-  - [Development](#development)
-  - [Production](#production)
-  - [Npm scripts](#npm-scripts)
-  - [Update dependencies](#update-dependencies)
-  - [Formatting](#formatting)
-    - [Windows prettier issue](#windows-prettier-issue)
-- [Docker](#docker)
-  - [Development image](#development-image)
-  - [Production image](#production-image)
-  - [Docker Compose](#docker-compose)
-  - [Dependabot](#dependabot)
-  - [SonarCloud](#sonarcloud)
-- [Licence](#licence)
-  - [About the licence](#about-the-licence)
+> ⚠️ **Proprietary — all rights reserved.** Work-in-progress proof of concept,
+> not licensed for public or third-party use. See [LICENSE](LICENSE).
 
-## Requirements
+---
 
-### Node.js
+## Features
 
-Please install Node Version Manager [nvm](https://github.com/creationix/nvm)
+- **Gantt timeline** — months / quarters / hybrid scales, with a virtual
+  timeline that compresses long periods so near-term detail stays readable.
+- **Swimlanes** — group the timeline by Defra Outcome, Objective, or Team.
+- **Group vs Service roadmaps** — group roadmaps use central **Government
+  Objectives**; service roadmaps use roadmap-specific **Objectives**.
+- **In-page editing** (no admin round-trip):
+  - Create / edit roadmaps and items in modals
+  - Manage tags — click chips to add/remove; create scoped Objectives & Teams;
+    select-only for central Outcomes & Gov Objectives
+  - Click any chip to view and edit its description
+- **Roadmap list** — search by name + filter by organisation.
+- **Per-roadmap tag scoping** — Teams and service Objectives are unique to a
+  roadmap; Outcomes, Gov Objectives, and Categories are central (admin-defined).
+- **Coloured tag chips** — auto-assigned from an accessible palette.
+- **Export** — download the current view as PNG or PDF.
+- **Spreadsheet import** — bulk-create items from an `.xlsx` template
+  (downloadable from the admin).
 
-To use the correct version of Node.js for this application, via nvm:
+---
 
-```bash
-cd pm-roadmap
-nvm use
-```
+## Tech stack
 
-## Server-side Caching
+| Layer | Choice |
+|-------|--------|
+| Backend | Django 5.2 |
+| Database | SQLite |
+| Templating | Django templates |
+| Interactivity | Alpine.js |
+| Data layer | JSON endpoints under `/api/` (CSRF-protected) |
+| Import/export | openpyxl · html2canvas + jsPDF |
 
-We use Catbox for server-side caching. By default the service will use CatboxRedis when deployed and CatboxMemory for
-local development.
-You can override the default behaviour by setting the `SESSION_CACHE_ENGINE` environment variable to either `redis` or
-`memory`.
+---
 
-Please note: CatboxMemory (`memory`) is _not_ suitable for production use! The cache will not be shared between each
-instance of the service and it will not persist between restarts.
+## Getting started
 
-## Redis
-
-Redis is an in-memory key-value store. Every instance of a service has access to the same Redis key-value store similar
-to how services might have a database (or MongoDB). All frontend services are given access to a namespaced prefixed that
-matches the service name. e.g. `my-service` will have access to everything in Redis that is prefixed with `my-service`.
-
-If your service does not require a session cache to be shared between instances or if you don't require Redis, you can
-disable setting `SESSION_CACHE_ENGINE=false` or changing the default value in `src/config/index.js`.
-
-## Proxy
-
-We are using forward-proxy which is set up by default. To make use of this: `import { fetch } from 'undici'` then
-because of the `setGlobalDispatcher(new ProxyAgent(proxyUrl))` calls will use the ProxyAgent Dispatcher
-
-If you are not using Wreck, Axios or Undici or a similar http that uses `Request`. Then you may have to provide the
-proxy dispatcher:
-
-To add the dispatcher to your own client:
-
-```javascript
-import { ProxyAgent } from 'undici'
-
-return await fetch(url, {
-  dispatcher: new ProxyAgent({
-    uri: proxyUrl,
-    keepAliveTimeout: 10,
-    keepAliveMaxTimeout: 10
-  })
-})
-```
-
-## Local Development
-
-### Setup
-
-Install application dependencies:
+Requires Python 3.11+.
 
 ```bash
-npm install
+git clone https://github.com/MarkJYoung/roadmap-django.git
+cd roadmap-django
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+python manage.py migrate
+python manage.py runserver
 ```
 
-### Git hooks
+Then open <http://localhost:8000/>.
 
-Install git hooks (optional)
+The repository ships with a populated `db.sqlite3` containing demo data, so the
+app is usable immediately. To explore the admin, create a superuser:
 
 ```bash
-npm run git:hooks
+python manage.py createsuperuser
 ```
 
-### Development
+…then sign in at <http://localhost:8000/admin/>.
 
-To run the application in `development` mode run:
+---
+
+## Data model
+
+| Model | Purpose |
+|-------|---------|
+| **Roadmap** | `name`, `team`, `organisations` (M2M), `roadmap_type` (group/service), `mission`, `vision`, `tags` |
+| **Organisation** | Delivery organisation (`name`, `abbreviation`, `description`) |
+| **Item** | Activity / milestone / metric with dates, priority, size, links, tags, linked activities |
+| **Tag** | `outcome` · `gov_objective` · `objective` · `organisation` (Team) · `category`. Scoped types carry a `roadmap` FK; central types are global. |
+
+`roadmap.tags` is the single source of truth for which objectives / outcomes /
+teams appear in a roadmap's header.
+
+---
+
+## JSON API
+
+Same-origin endpoints backing the modals (CSRF token sent via `X-CSRFToken`):
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET` | `/api/organisations/` | List organisations |
+| `GET` `POST` | `/api/tags/` | List (filter by `?type=` & `?roadmap=`) / create |
+| `PUT` `DELETE` | `/api/tags/<id>/` | Update / delete a tag |
+| `POST` | `/api/roadmaps/` | Create a roadmap |
+| `PUT` `DELETE` | `/api/roadmaps/<id>/` | Update (incl. tag membership) / delete |
+| `POST` | `/api/roadmaps/<id>/items/` | Create an item |
+| `PUT` `DELETE` | `/api/items/<id>/` | Update / delete an item |
+
+---
+
+## Tests
+
+A Django `TestCase` suite (no extra dependencies) covers models, the JSON API,
+the gantt/view logic, and the spreadsheet importer:
 
 ```bash
-npm run dev
+python manage.py test
 ```
 
-### Production
+Tests run against a throwaway test database — the committed `db.sqlite3` is left
+untouched. Modules live in `roadmap/tests/` (`test_models.py`, `test_api.py`,
+`test_views.py`, `test_importer.py`).
 
-To mimic the application running in `production` mode locally run:
+---
 
-```bash
-npm start
+## Project layout
+
+```
+config/             Django project settings & URLs
+roadmap/
+  models.py         Roadmap, Organisation, Item, Tag
+  views.py          List + detail pages, gantt builder
+  api.py            JSON endpoints
+  importers.py      Spreadsheet import + template generator
+  admin.py          Django admin
+  migrations/       Schema + data migrations
+  templates/
+static/             CSS + JS (Alpine component, export)
 ```
 
-### Npm scripts
+---
 
-All available Npm scripts can be seen in [package.json](./package.json)
-To view them in your command line run:
+## Notes
 
-```bash
-npm run
-```
-
-### Update dependencies
-
-To update dependencies use [npm-check-updates](https://github.com/raineorshine/npm-check-updates):
-
-> The following script is a good start. Check out all the options on
-> the [npm-check-updates](https://github.com/raineorshine/npm-check-updates)
-
-```bash
-ncu --interactive --format group
-```
-
-### Formatting
-
-#### Windows prettier issue
-
-If you are having issues with formatting of line breaks on Windows update your global git config by running:
-
-```bash
-git config --global core.autocrlf false
-```
-
-## Docker
-
-### Development image
-
-> [!TIP]
-> For Apple Silicon users, you may need to add `--platform linux/amd64` to the `docker run` command to ensure
-> compatibility fEx: `docker build --platform=linux/arm64 --no-cache --tag pm-roadmap`
-
-Build:
-
-```bash
-docker build --target development --no-cache --tag pm-roadmap:development .
-```
-
-Run:
-
-```bash
-docker run -p 3000:3000 pm-roadmap:development
-```
-
-### Production image
-
-Build:
-
-```bash
-docker build --no-cache --tag pm-roadmap .
-```
-
-Run:
-
-```bash
-docker run -p 3000:3000 pm-roadmap
-```
-
-### Docker Compose
-
-A local environment with:
-
-- Floci (replacing Localstack) for AWS services (S3, SQS)
-- Redis
-- MongoDB
-- This service.
-- A commented out backend example.
-
-```bash
-docker compose up --build -d
-```
-
-### Dependabot
-
-We have added an example dependabot configuration file to the repository. You can enable it by renaming
-the [.github/example.dependabot.yml](.github/example.dependabot.yml) to `.github/dependabot.yml`
-
-### SonarCloud
-
-Instructions for setting up SonarCloud can be found in [sonar-project.properties](./sonar-project.properties).
-
-## Licence
-
-THIS INFORMATION IS LICENSED UNDER THE CONDITIONS OF THE OPEN GOVERNMENT LICENCE found at:
-
-<http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3>
-
-The following attribution statement MUST be cited in your products and applications when using this information.
-
-> Contains public sector information licensed under the Open Government license v3
-
-### About the licence
-
-The Open Government Licence (OGL) was developed by the Controller of Her Majesty's Stationery Office (HMSO) to enable
-information providers in the public sector to license the use and re-use of their information under a common open
-licence.
-
-It is designed to encourage use and re-use of information freely and flexibly, with only a few conditions.
+- `DEBUG = True` and a development `SECRET_KEY` are committed for convenience —
+  set real values via environment before any non-local deployment.
+- The committed `db.sqlite3` is demo data, not production data.

@@ -1,0 +1,344 @@
+{# ── Item view modal ──────────────────────────────────────────── #}
+<template x-if="activeItem">
+  <div class="modal-overlay" @click.self="closeModal()">
+    <div class="modal-card">
+      <button class="modal-close" @click="closeModal()" aria-label="Close">&times;</button>
+      <div style="position:absolute; top:48px; right:16px; display:flex; gap:6px;">
+        <button type="button" class="btn btn-ghost" style="font-size:11px;" @click="editActiveItem()">Edit</button>
+        <button type="button" class="btn btn-ghost" style="font-size:11px; color:var(--priority-critical);" @click="deleteActiveItem()">Delete</button>
+      </div>
+
+      <div>
+        <span class="modal-card__type-badge" :class="'badge--' + activeItem.item_type">
+          <span x-text="activeItem.item_type_display"></span>
+        </span>
+      </div>
+      <div class="modal-card__title" x-text="activeItem.title"></div>
+
+      <template x-if="activeItem.description">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">Description</div>
+          <div class="modal-card__section-value" x-text="activeItem.description"></div>
+        </div>
+      </template>
+
+      <div class="modal-card__meta-row">
+        <template x-if="activeItem.priority">
+          <div class="modal-card__meta-item">
+            <span class="modal-card__section-label">Priority</span>
+            <span class="priority-badge" :class="'priority-badge--' + activeItem.priority" x-text="activeItem.priority_display"></span>
+          </div>
+        </template>
+        <template x-if="activeItem.size">
+          <div class="modal-card__meta-item">
+            <span class="modal-card__section-label">Size</span>
+            <span class="size-badge" x-text="activeItem.size"></span>
+          </div>
+        </template>
+        <template x-if="activeItem.start_date">
+          <div class="modal-card__meta-item">
+            <span class="modal-card__section-label">Start</span>
+            <span class="modal-card__section-value" x-text="activeItem.start_date"></span>
+          </div>
+        </template>
+        <template x-if="activeItem.end_date">
+          <div class="modal-card__meta-item">
+            <span class="modal-card__section-label">End</span>
+            <span class="modal-card__section-value" x-text="activeItem.end_date"></span>
+          </div>
+        </template>
+      </div>
+
+      <template x-if="activeItem.prd_link">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">PRD</div>
+          <a class="modal-card__link" :href="activeItem.prd_link" target="_blank" rel="noopener" x-text="activeItem.prd_link"></a>
+        </div>
+      </template>
+      <template x-if="activeItem.backlog_link">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">Backlog</div>
+          <a class="modal-card__link" :href="activeItem.backlog_link" target="_blank" rel="noopener" x-text="activeItem.backlog_link"></a>
+        </div>
+      </template>
+
+      <template x-if="activeItem.tags && activeItem.tags.length">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">Tags</div>
+          <div class="modal-card__tags">
+            <template x-for="tag in activeItem.tags" :key="tag.id">
+              <span class="tag-pill" :style="'border-color:' + tag.colour + '; color:' + tag.colour" x-text="tag.name + ' (' + tag.tag_type + ')'"></span>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="activeItem.linked_activities && activeItem.linked_activities.length">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">Linked Activities</div>
+          <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+            <template x-for="act in activeItem.linked_activities" :key="act.id">
+              <span style="font-size:12px; color:var(--text-main);" x-text="act.title"></span>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+</template>
+
+{# ── Tag info modal (view + edit description) ──────────────────── #}
+<template x-if="activeTag">
+  <div class="modal-overlay" @click.self="closeTagModal()">
+    <div class="modal-card" style="max-width:420px;">
+      <button class="modal-close" @click="closeTagModal()" aria-label="Close">&times;</button>
+      <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;" x-text="activeTag.type_label"></div>
+      <div class="modal-card__title" style="display:flex; align-items:center; gap:8px; margin-bottom:1rem;">
+        <span style="display:inline-block; width:12px; height:12px; border-radius:3px;" :style="'background:' + activeTag.colour + '; border:1px solid ' + activeTag.colour"></span>
+        <span x-text="activeTag.name"></span>
+      </div>
+      <label class="modal-card__section-label">Description</label>
+      <textarea x-model="tagInfoDraft" rows="4" placeholder="Add a description of what this is…" class="form-input"></textarea>
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="button" class="btn btn-primary" @click="saveTagInfo()" :disabled="tagInfoSaving" x-text="tagInfoSaving ? 'Saving…' : 'Save'"></button>
+        <button type="button" class="btn btn-ghost" @click="closeTagModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+{# ── Edit roadmap modal ───────────────────────────────────────── #}
+<template x-if="showEditRoadmap">
+  <div class="modal-overlay" @click.self="closeEditRoadmap()">
+    <div class="modal-card" style="max-width:460px;">
+      <button class="modal-close" @click="closeEditRoadmap()" aria-label="Close">&times;</button>
+      <div class="modal-card__title" style="margin-bottom:1rem;">Edit roadmap</div>
+
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Name</label>
+        <input x-model="roadmapForm.name" type="text" class="form-input" />
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Type</label>
+        <input type="text" class="form-input" :value="roadmap.roadmap_type_display" disabled style="opacity:.6;" />
+        <span style="font-size:11px; color:var(--text-muted);">Type cannot be changed after creation.</span>
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Team</label>
+        <input x-model="roadmapForm.team" type="text" class="form-input" />
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Organisations</label>
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          <template x-for="org in orgOptions" :key="org.id">
+            <label class="modal-org-option" :class="roadmapForm.organisations.includes(String(org.id)) ? 'modal-org-option--selected' : ''">
+              <input type="checkbox" :value="String(org.id)" x-model="roadmapForm.organisations" style="display:none;" />
+              <span x-text="org.name"></span>
+            </label>
+          </template>
+        </div>
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Mission</label>
+        <textarea x-model="roadmapForm.mission" rows="2" class="form-input"></textarea>
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Vision</label>
+        <textarea x-model="roadmapForm.vision" rows="2" class="form-input"></textarea>
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Description</label>
+        <textarea x-model="roadmapForm.description" rows="2" class="form-input"></textarea>
+      </div>
+
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="button" class="btn btn-primary" @click="saveEditRoadmap()">Save</button>
+        <button type="button" class="btn btn-ghost" @click="closeEditRoadmap()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+{# ── Manage tags modal ────────────────────────────────────────── #}
+<template x-if="showManage">
+  <div class="modal-overlay" @click.self="closeManage()">
+    <div class="modal-card" style="max-width:480px;">
+      <button class="modal-close" @click="closeManage()" aria-label="Close">&times;</button>
+      <div class="modal-card__title" style="margin-bottom:1.25rem;">Manage roadmap tags</div>
+
+      <template x-for="section in [
+          {type: manage.objective_type, label: manage.objective_label, creatable: manage.objective_creatable},
+          {type: 'outcome', label: 'Defra Outcomes', creatable: false},
+          {type: 'organisation', label: 'Teams', creatable: true}
+        ]" :key="section.type">
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;" x-text="section.label"></div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <template x-for="tag in (managePool[section.type] || [])" :key="tag.id">
+              <button type="button" class="modal-tag-pill"
+                      @click="toggleManage(tag.id)"
+                      :class="isManageSelected(tag.id) ? 'modal-tag-pill--selected' : ''"
+                      :style="isManageSelected(tag.id)
+                        ? 'background:' + tag.colour + '; border-color:' + tag.colour + '; color:#fff;'
+                        : 'border-color:' + tag.colour + '; color:' + tag.colour"
+                      :title="isManageSelected(tag.id) ? 'Click to remove' : 'Click to add'">
+                <span x-text="tag.name"></span>
+              </button>
+            </template>
+            <span x-show="!(managePool[section.type] || []).length" style="font-size:12px; color:var(--text-muted);">None available</span>
+          </div>
+          <template x-if="section.creatable">
+            <div style="display:flex; gap:6px;">
+              <input x-model="manageInputs[section.type]" type="text" placeholder="New…"
+                     @keydown.enter.prevent="manageAdd(section.type)" class="form-input" style="flex:1;" />
+              <button type="button" class="btn btn-ghost" @click="manageAdd(section.type)">Add</button>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+        <button type="button" class="btn btn-primary" @click="saveManage()">Save</button>
+        <button type="button" class="btn btn-ghost" @click="closeManage()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+{# ── Item create / edit modal ─────────────────────────────────── #}
+<template x-if="showItemForm">
+  <div class="modal-overlay" @click.self="closeItemForm()">
+    <div class="modal-card" style="max-width:520px;">
+      <button class="modal-close" @click="closeItemForm()" aria-label="Close">&times;</button>
+      <div class="modal-card__title" style="margin-bottom:1rem;" x-text="itemFormMode === 'edit' ? 'Edit item' : 'New item'"></div>
+
+      <div class="modal-card__meta-row" style="gap:0.75rem;">
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Type</label>
+          <select x-model="itemForm.item_type" class="form-input">
+            <option value="activity">Activity</option>
+            <option value="milestone">Milestone</option>
+            <option value="metric">Metric</option>
+          </select>
+        </div>
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Priority</label>
+          <select x-model="itemForm.priority" class="form-input">
+            <option value="">—</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Size</label>
+          <select x-model="itemForm.size" class="form-input">
+            <option value="">—</option>
+            <option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Title</label>
+        <input x-model="itemForm.title" type="text" class="form-input" />
+      </div>
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Description</label>
+        <textarea x-model="itemForm.description" rows="2" class="form-input"></textarea>
+      </div>
+
+      <div class="modal-card__meta-row" style="gap:0.75rem;">
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Start date</label>
+          <input x-model="itemForm.start_date" type="date" class="form-input" />
+        </div>
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">End date</label>
+          <input x-model="itemForm.end_date" type="date" class="form-input" />
+        </div>
+      </div>
+      <div class="modal-card__meta-row" style="gap:0.75rem;">
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">PRD link</label>
+          <input x-model="itemForm.prd_link" type="url" class="form-input" />
+        </div>
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Backlog link</label>
+          <input x-model="itemForm.backlog_link" type="url" class="form-input" />
+        </div>
+      </div>
+
+      {# Tag pickers per type #}
+      <template x-for="section in [
+          {type: 'outcome', label: 'Defra Outcomes', creatable: false},
+          {type: objectiveType, label: objectiveType === 'objective' ? 'Objectives' : 'Gov Objectives', creatable: objectiveType === 'objective'},
+          {type: 'organisation', label: 'Teams', creatable: true},
+          {type: 'category', label: 'Item Categories', creatable: true}
+        ]" :key="section.type">
+        <div class="modal-card__section">
+          <label class="modal-card__section-label" x-text="section.label"></label>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+            <template x-for="tag in (itemPool[section.type] || [])" :key="tag.id">
+              <button type="button" class="modal-tag-pill"
+                      @click="toggleItemTag(tag.id)"
+                      :class="isItemTagSelected(tag.id) ? 'modal-tag-pill--selected' : ''"
+                      :style="isItemTagSelected(tag.id)
+                        ? 'background:' + tag.colour + '; border-color:' + tag.colour + '; color:#fff;'
+                        : 'border-color:' + tag.colour + '; color:' + tag.colour">
+                <span x-text="tag.name"></span>
+              </button>
+            </template>
+            <span x-show="!(itemPool[section.type] || []).length" style="font-size:12px; color:var(--text-muted);">None</span>
+          </div>
+          <template x-if="section.creatable">
+            <div style="display:flex; gap:6px;">
+              <input x-model="itemInputs[section.type]" type="text" placeholder="New…"
+                     @keydown.enter.prevent="itemAddTag(section.type)" class="form-input" style="flex:1;" />
+              <button type="button" class="btn btn-ghost" @click="itemAddTag(section.type)">Add</button>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      {# Linked activities (for milestones/metrics) #}
+      <template x-if="itemForm.item_type !== 'activity' && activities.length">
+        <div class="modal-card__section">
+          <label class="modal-card__section-label">Linked Activities</label>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <template x-for="act in activities" :key="act.id">
+              <button type="button" class="modal-tag-pill"
+                      @click="itemForm.linked_activities.includes(act.id) ? itemForm.linked_activities.splice(itemForm.linked_activities.indexOf(act.id),1) : itemForm.linked_activities.push(act.id)"
+                      :class="itemForm.linked_activities.includes(act.id) ? 'modal-tag-pill--selected' : ''"
+                      :style="itemForm.linked_activities.includes(act.id) ? 'background:#555; border-color:#555; color:#fff;' : 'border-color:#999; color:#555;'">
+                <span x-text="act.title"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+        <button type="button" class="btn btn-primary" @click="saveItem()" x-text="itemFormMode === 'edit' ? 'Save' : 'Create'"></button>
+        <button type="button" class="btn btn-ghost" @click="closeItemForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+{# ── Export modal ─────────────────────────────────────────────── #}
+<template x-if="showExport">
+  <div class="modal-overlay" @click.self="closeExport()">
+    <div class="modal-card" style="max-width:360px;">
+      <button class="modal-close" @click="closeExport()" aria-label="Close">&times;</button>
+      <div class="modal-card__title" style="margin-bottom:0.5rem;">Export roadmap</div>
+      <p style="font-size:13px; color:var(--text-muted); margin:0 0 1.25rem;">Download the current view as an image or a PDF.</p>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <button type="button" class="btn btn-primary" @click="doExport('png')">Export as PNG (image)</button>
+        <button type="button" class="btn btn-primary" @click="doExport('pdf')">Export as PDF</button>
+        <button type="button" class="btn btn-ghost" @click="closeExport()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</template>

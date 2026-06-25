@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Upload items from spreadsheet{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Home</a> &rsaquo;
+  <a href="{% url 'admin:roadmap_roadmap_changelist' %}">Roadmaps</a> &rsaquo;
+  Upload items from spreadsheet
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>Upload items from spreadsheet</h1>
+
+<p>
+  Use this page to create or update roadmap items in bulk.
+  <strong><a href="{{ template_url }}">Download the template spreadsheet</a></strong>
+  to get started — fill in the Roadmap ID on cell B1, then add one item per row from row 4 onwards.
+</p>
+
+<ul style="margin-bottom:1.5rem; color:#666;">
+  <li>If an item with the same <strong>Title</strong> already exists on that roadmap it will be <strong>updated</strong>.</li>
+  <li>Tags must already exist in the system — use the <a href="{% url 'admin:roadmap_tag_changelist' %}">Tags admin</a> to add any missing ones first.</li>
+  <li>Dates should be formatted as <strong>DD/MM/YYYY</strong>.</li>
+</ul>
+
+<form method="post" enctype="multipart/form-data" style="margin-bottom:2rem;">
+  {% csrf_token %}
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <input type="file" name="spreadsheet" accept=".xlsx" required
+           style="border:1px solid #ccc; padding:6px 10px; border-radius:4px; background:#fff;">
+    <button type="submit" class="button default">Import</button>
+  </div>
+</form>
+
+{% if result %}
+  {% with r=result %}
+
+  {# ── Summary bar ───────────────────────────────────────────────────────── #}
+  <div style="display:flex; gap:1.5rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+    <div style="background:#e8f5e9; border:1px solid #a5d6a7; border-radius:6px; padding:.75rem 1.25rem; min-width:110px; text-align:center;">
+      <div style="font-size:2rem; font-weight:700; color:#2e7d32;">{{ r.created }}</div>
+      <div style="font-size:.8rem; color:#388e3c;">Created</div>
+    </div>
+    <div style="background:#e3f2fd; border:1px solid #90caf9; border-radius:6px; padding:.75rem 1.25rem; min-width:110px; text-align:center;">
+      <div style="font-size:2rem; font-weight:700; color:#1565c0;">{{ r.updated }}</div>
+      <div style="font-size:.8rem; color:#1976d2;">Updated</div>
+    </div>
+    <div style="background:#fff8e1; border:1px solid #ffe082; border-radius:6px; padding:.75rem 1.25rem; min-width:110px; text-align:center;">
+      <div style="font-size:2rem; font-weight:700; color:#f57f17;">{{ r.skipped }}</div>
+      <div style="font-size:.8rem; color:#f9a825;">Skipped</div>
+    </div>
+    {% if r.roadmap %}
+    <div style="display:flex; align-items:center; gap:.5rem; padding:.75rem 1.25rem; background:#f5f5f5; border-radius:6px; border:1px solid #ddd;">
+      <span style="color:#666; font-size:.85rem;">Roadmap:</span>
+      <strong>{{ r.roadmap.name }}</strong>
+      <span style="color:#999; font-size:.8rem;">(ID {{ r.roadmap.pk }})</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Errors ────────────────────────────────────────────────────────────── #}
+  {% if r.errors %}
+  <div style="background:#ffebee; border:1px solid #ef9a9a; border-radius:6px; padding:1rem 1.25rem; margin-bottom:1rem;">
+    <h3 style="margin:0 0 .5rem; color:#c62828;">⚠ Errors ({{ r.errors|length }})</h3>
+    <ul style="margin:0; padding-left:1.25rem; color:#b71c1c;">
+      {% for e in r.errors %}<li style="margin-bottom:.25rem;">{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Warnings ──────────────────────────────────────────────────────────── #}
+  {% if r.warnings %}
+  <div style="background:#fff8e1; border:1px solid #ffe082; border-radius:6px; padding:1rem 1.25rem; margin-bottom:1rem;">
+    <h3 style="margin:0 0 .5rem; color:#f57f17;">Warnings ({{ r.warnings|length }})</h3>
+    <ul style="margin:0; padding-left:1.25rem; color:#e65100;">
+      {% for w in r.warnings %}<li style="margin-bottom:.25rem;">{{ w }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ── Success ───────────────────────────────────────────────────────────── #}
+  {% if not r.errors and r.roadmap %}
+  <p>
+    <a href="{% url 'admin:roadmap_roadmap_change' r.roadmap.pk %}">
+      View {{ r.roadmap.name }} in admin
+    </a>
+  </p>
+  {% endif %}
+
+  {% endwith %}
+{% endif %}
+
+{% endblock %}

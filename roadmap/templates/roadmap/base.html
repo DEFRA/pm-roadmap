@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Roadmap{% endblock %}</title>
+  {% load static %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=10" />
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="page-container">
+
+  <nav>
+    <a href="{% url 'roadmap:list' %}" class="nav-brand">Roadmap</a>
+    <div class="nav-links">
+      <a href="{% url 'roadmap:list' %}">All Roadmaps</a>
+    </div>
+  </nav>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -18,22 +18,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Test code and Create Test Coverage Reports
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Security audit
-        run: npm run security-audit
-
-      - run: |
-          npm ci
-          npm run build:frontend
-          npm run format:check
-          npm run lint
-          npm test
-
       - name: Test Docker Image Build
         run: |
           set +e

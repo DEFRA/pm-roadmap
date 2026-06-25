@@ -1,0 +1,646 @@
+@import 'design-tokens.css';
+
+/* ─── Fonts ──────────────────────────────────────────────────── */
+/* Loaded via Google Fonts in base.html:
+   Outfit (headings) — geometric, strong presence at large sizes
+   Lexend (body)     — accessibility-optimised, easy to read at small sizes */
+
+/* ─── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Lexend', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  color: var(--accent-gold);
+}
+
+a { color: var(--accent-blue); text-decoration: underline; }
+a:hover { color: var(--accent-gold); }
+
+/* ─── Layout ─────────────────────────────────────────────────── */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main { flex: 1; padding: 1.5rem; }
+
+/* ─── Nav ────────────────────────────────────────────────────── */
+nav {
+  background-color: #111827;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.nav-brand {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.2rem;
+  color: #f9fafb;
+  text-decoration: none;
+}
+.nav-brand:hover { color: #d1d5db; text-decoration: none; }
+
+.nav-links { display: flex; gap: 1.5rem; align-items: center; }
+.nav-links a { color: #9ca3af; text-decoration: none; font-size: 13px; }
+.nav-links a:hover { color: #f9fafb; }
+
+/* ─── Buttons ────────────────────────────────────────────────── */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1.25;
+  font-family: 'Lexend', system-ui, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn-primary { background: var(--accent-gold); color: var(--bg-main); }
+.btn-primary:hover { background: var(--accent-gold-hover); color: #fff; text-decoration: none; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-mid);
+}
+.btn-ghost:hover { color: var(--text-main); border-color: var(--text-muted); text-decoration: none; }
+
+.btn-ghost--active {
+  color: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
+
+/* ─── Cards ──────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+/* ─── Roadmap list ───────────────────────────────────────────── */
+.roadmap-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 700px;
+}
+
+.roadmap-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.2s;
+}
+.roadmap-card:hover { border-color: var(--border-mid); }
+.roadmap-card__name {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.1rem;
+  color: var(--accent-gold);
+  text-decoration: none;
+}
+.roadmap-card__name:hover { color: var(--text-main); }
+.roadmap-card__desc { font-size: 13px; color: var(--text-muted); }
+
+/* ─── Gantt toolbar ──────────────────────────────────────────── */
+.gantt-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.gantt-toolbar__title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.3rem;
+  color: var(--accent-gold);
+  margin: 0;
+  flex: 1;
+}
+
+.gantt-toolbar__group { display: flex; gap: 0.5rem; align-items: center; }
+.gantt-toolbar__label { font-size: 12px; color: var(--text-muted); }
+
+/* ─── Roadmap header panel ───────────────────────────────────── */
+.roadmap-header {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem 2.5rem;
+}
+
+.roadmap-header__top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.roadmap-header__name {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.5rem;
+  color: var(--accent-gold);
+  margin: 0;
+}
+
+.roadmap-header__org-name {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.roadmap-header__field { display: flex; flex-direction: column; gap: 4px; grid-column: 1 / -1; }
+
+.roadmap-header__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+.roadmap-header__label--link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.roadmap-header__label--link:hover {
+  color: var(--text-main);
+}
+.roadmap-header__label--active {
+  color: var(--accent-gold);
+}
+
+.roadmap-header__value {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.roadmap-header__tags {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1rem;
+}
+
+.roadmap-header__tag-group { display: flex; flex-direction: column; gap: 6px; }
+
+.roadmap-header__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ─── Gantt wrapper ──────────────────────────────────────────── */
+.gantt-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.gantt {
+  display: grid;
+  /* col 1: lane labels, col 2: timeline */
+  grid-template-columns: 180px 1fr;
+  /* min-width set dynamically via inline style based on column count */
+}
+
+/* ─── Gantt header row ───────────────────────────────────────── */
+.gantt-header-label {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  height: var(--gantt-header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  position: sticky;
+  left: 0;
+  z-index: 21;
+}
+
+.gantt-header-label select {
+  transition: color 0.15s;
+}
+
+.gantt-header-label select:hover {
+  color: var(--text-main);
+}
+
+.gantt-header-label select:focus {
+  outline: none;
+  color: var(--accent-gold);
+}
+
+.gantt-header-months {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  height: var(--gantt-header-h);
+  display: flex;
+  position: relative;
+}
+
+.gantt-month-cell {
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* ─── Gantt swimlane ─────────────────────────────────────────── */
+.gantt-lane-label {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  position: sticky;
+  left: 0;
+  z-index: 20;
+}
+
+.gantt-lane-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.gantt-lane-tracks {
+  border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+/* Each track sub-row within the timeline column */
+.gantt-track {
+  position: relative;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.gantt-track:last-child { border-bottom: none; }
+
+.gantt-track-label {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  opacity: 0.7;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Month grid lines on tracks */
+.gantt-track__grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+.gantt-track__grid-col {
+  border-right: 1px solid var(--border-subtle);
+  height: 100%;
+  flex-shrink: 0;
+}
+
+/* ─── Gantt bars ─────────────────────────────────────────────── */
+.gantt-bar {
+  position: absolute;
+  height: var(--gantt-row-height);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+  z-index: 2;
+}
+.gantt-bar:hover { filter: brightness(1.15); transform: scaleY(1.05); }
+
+.gantt-bar--activity  { background: var(--color-activity);  color: #fff; }
+.gantt-bar--milestone { background: var(--color-milestone); color: #fff; }
+.gantt-bar--metric    { background: var(--color-metric);    color: #fff; }
+
+/* Priority tint strip on left edge of activity bars */
+.gantt-bar--priority-low      { border-left: 3px solid var(--priority-low); }
+.gantt-bar--priority-medium   { border-left: 3px solid var(--priority-medium); }
+.gantt-bar--priority-high     { border-left: 3px solid var(--priority-high); }
+.gantt-bar--priority-critical { border-left: 3px solid var(--priority-critical); }
+
+/* ─── Milestone markers ──────────────────────────────────────── */
+.gantt-milestone-marker {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 3;
+  /* center the icon on the date point */
+  transform: translateX(-50%);
+}
+
+.gantt-milestone-marker__diamond {
+  width: 14px;
+  height: 14px;
+  background: var(--color-milestone);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  border-radius: 2px;
+  transition: filter 0.15s, transform 0.15s;
+}
+.gantt-milestone-marker:hover .gantt-milestone-marker__diamond {
+  filter: brightness(1.2);
+  transform: rotate(45deg) scale(1.2);
+}
+
+.gantt-milestone-marker__label {
+  margin-top: 8px;
+  font-size: 9px;
+  color: var(--color-milestone);
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  /* allow label to overflow the track visually */
+}
+
+/* Milestone tracks need overflow visible so labels aren't clipped */
+.gantt-track--milestones {
+  overflow: visible;
+}
+
+/* ─── Modal overlay (item card popup) ────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  padding: 1.75rem;
+  box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.modal-close:hover { color: var(--text-main); }
+
+.modal-card__type-badge {
+  display: inline-block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+.badge--activity  { background: var(--color-activity);  color: #fff; }
+.badge--milestone { background: var(--color-milestone); color: #fff; }
+.badge--metric    { background: var(--color-metric);    color: #fff; }
+
+.modal-card__title {
+  font-family: 'Outfit', system-ui, sans-serif;
+  font-size: 1.25rem;
+  color: var(--accent-gold);
+  margin-bottom: 0.75rem;
+}
+
+.modal-card__section { margin-top: 1rem; }
+.modal-card__section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.modal-card__section-value {
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.modal-card__meta-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.modal-card__meta-item { display: flex; flex-direction: column; gap: 2px; }
+
+.modal-card__link {
+  color: var(--accent-blue);
+  font-size: 13px;
+  word-break: break-all;
+}
+.modal-card__link:hover { color: var(--accent-gold); }
+
+.modal-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0.5rem;
+}
+.tag-pill {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border-mid);
+  color: var(--text-main);
+}
+.tag-pill--clickable {
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  /* rendered as a <button>, reset to look like the span pill */
+  background: transparent;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.tag-pill--clickable:hover {
+  opacity: 0.8;
+  transform: scale(1.04);
+}
+
+/* ── Modal controls / chip toggles (parity with Node UI) ───────── */
+.roadmap-header__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--accent-primary, #801650);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-primary, #801650);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.roadmap-header__add:hover {
+  background: var(--accent-primary, #801650);
+  color: #fff;
+}
+
+.modal-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 2px solid;
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.modal-tag-pill:hover { opacity: 0.85; }
+
+.modal-org-option {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--border-mid);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.modal-org-option--selected {
+  background: var(--accent-primary, #801650);
+  border-color: var(--accent-primary, #801650);
+  color: #fff;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+textarea.form-input { resize: vertical; line-height: 1.5; }
+
+/* Priority badge */
+.priority-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.priority-badge--low      { color: var(--priority-low);      background: rgba(0,175,65,0.1); }
+.priority-badge--medium   { color: var(--priority-medium);   background: rgba(244,106,37,0.1); }
+.priority-badge--high     { color: var(--priority-high);     background: rgba(128,22,80,0.1); }
+.priority-badge--critical { color: var(--priority-critical); background: rgba(192,57,43,0.1); }
+
+/* Size badge */
+.size-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ─── Empty states ───────────────────────────────────────────── */
+.empty-state {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+/* ─── Alerts ─────────────────────────────────────────────────── */
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  margin-bottom: 1rem;
+}
+.alert-info { background: rgba(40,161,151,0.08); border: 1px solid rgba(40,161,151,0.3); color: var(--text-main); }
