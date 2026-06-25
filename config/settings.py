@@ -29,10 +29,13 @@ DEBUG = True
 
 
 ALLOWED_HOSTS = []
+CSRF_TRUSTED_ORIGINS = []
 
 environment = os.getenv("ENVIRONMENT")
 if environment:
-    ALLOWED_HOSTS.append(f"pm-roadmap.{environment}.cdp-int.defra.cloud")
+    internal_url = f"pm-roadmap.{environment}.cdp-int.defra.cloud"
+    ALLOWED_HOSTS.append(internal_url)
+    CSRF_TRUSTED_ORIGINS.append(internal_url)
 
 # Application definition
 
