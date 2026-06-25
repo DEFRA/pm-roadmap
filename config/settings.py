@@ -26,8 +26,13 @@ SECRET_KEY = 'django-insecure-9*9u4gr&_4x3mr0o25p(ir^+vav*4-2@h&0423evc$2ft14g_@
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+
+
 ALLOWED_HOSTS = []
 
+environment = os.getenv("ENVIRONMENT")
+if environment:
+    ALLOWED_HOSTS.append(f"pm-roadmap.{environment}.cdp-int.defra.cloud")
 
 # Application definition
 
