@@ -1,12 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+__pycache__
+**/__pycache__
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Django
+*.log
+local_settings.py
+/staticfiles/
+
+# SQLite backups — the demo db.sqlite3 IS committed so the POC runs on clone;
+# point-in-time backups are not.
+db.sqlite3.bak*
+
+# OS / editor
 .DS_Store
-.npm/
-.vscode
-.idea
-.public
-node_modules
-npm-debug.log
-coverage
-.cache
-.envrc
-tsconfig.tsbuildinfo
-.env
+*.swp
+.idea/
+.vscode/
+
+# Claude Code machine-local settings (keep launch.json)
+.claude/settings.local.json
+
+# Sqlite instances
+data/db.sqlite3
