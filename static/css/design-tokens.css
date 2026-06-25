@@ -1,0 +1,47 @@
+:root {
+  /* Background layers */
+  --bg-main:     #ffffff;
+  --bg-surface:  #f8f9fa;
+  --bg-elevated: #edf0f4;
+  --bg-card:     #f3f5f8;
+
+  /* Text */
+  --text-main:   #111111;
+  --text-muted:  #595959;
+
+  /* Accent: magenta (primary brand colour) */
+  --accent-gold:       #801650;
+  --accent-gold-hover: #5e0f3b;
+
+  /* Accent: semantic */
+  --accent-green:   #00af41;
+  --accent-blue:    #28a197;
+  --accent-danger:  #c0392b;
+  --accent-warning: #f46a25;
+
+  /* Item type colours */
+  --color-activity:  #28a197;   /* teal */
+  --color-milestone: #f46a25;   /* orange */
+  --color-metric:    #00af41;   /* green */
+
+  /* Priority colours */
+  --priority-low:      #00af41;
+  --priority-medium:   #f46a25;
+  --priority-high:     #801650;
+  --priority-critical: #c0392b;
+
+  /* Borders */
+  --border-subtle: #e2e8f0;
+  --border-mid:    #94a3b8;
+
+  /* Spacing */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Track height per row in the gantt */
+  --gantt-row-height:           28px;
+  --gantt-milestone-row-height: 52px;  /* icon (14px) + gap (8px) + label (~12px) + breathing room */
+  --gantt-track-pad:            6px;
+  --gantt-header-h:             40px;
+}

@@ -1,0 +1,10 @@
+logging:
+  type: json
+dbs:
+  - path: /home/chris/code/python/roadmap-django/db.sqlite3
+    replica:
+      type: s3
+      bucket: ${BUCKET_NAME}
+      path: roadmap-django
+      endpoint: http://localhost:4566
+      force-path-style: true

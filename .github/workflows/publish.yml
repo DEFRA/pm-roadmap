@@ -28,16 +28,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
 
-      - name: Test code and Create Test Coverage Reports
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: |
-          npm ci
-          npm run build:frontend
-          npm test
-
       - name: Build and Publish
         uses: DEFRA/cdp-build-action/build@main
         with:

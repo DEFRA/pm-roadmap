@@ -1,0 +1,258 @@
+{% extends "roadmap/base.html" %}
+{% load static %}
+{% block title %}{{ roadmap.name }}{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  .gantt-track-inner { position: relative; }
+  /* Hide interactive chrome while exporting to image/PDF */
+  body.exporting .no-export { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div x-data="roadmapApp()"
+     data-roadmap-id="{{ roadmap.pk }}"
+     @keydown.escape.window="closeModal(); closeTagModal(); closeManage(); closeEditRoadmap(); closeItemForm(); closeExport()">
+
+  <div id="roadmap-export">
+  {# ── Roadmap header panel ────────────────────────────────────── #}
+  <div class="roadmap-header">
+
+    {# Top row: name + team/orgs + actions #}
+    <div class="roadmap-header__top">
+      <h1 class="roadmap-header__name">{{ roadmap.name }}</h1>
+      <span class="roadmap-header__org-name">{{ roadmap.get_roadmap_type_display }} roadmap</span>
+      {% if roadmap.team %}<span class="roadmap-header__org-name">{{ roadmap.team }}</span>{% endif %}
+      {% for org in roadmap.organisations.all %}
+        <span class="tag-pill" style="font-size:10px;">{{ org.abbreviation|default:org.name }}</span>
+      {% endfor %}
+      <button type="button" class="roadmap-header__add no-export" @click="openEditRoadmap()"
+              title="Edit roadmap details" aria-label="Edit roadmap details" style="margin-left:auto;">&#9998;</button>
+      <button type="button" class="btn btn-ghost no-export" @click="openExport()" style="font-size:11px;">Export</button>
+      <button type="button" class="btn btn-primary no-export" @click="openNewItem()" style="font-size:11px;">+ Add Item</button>
+      <a href="{% url 'roadmap:list' %}" class="btn btn-ghost no-export" style="font-size:11px;">&larr; All roadmaps</a>
+    </div>
+
+    {% if roadmap.mission %}
+      <div class="roadmap-header__field">
+        <span class="roadmap-header__label">Mission</span>
+        <span class="roadmap-header__value">{{ roadmap.mission }}</span>
+      </div>
+    {% endif %}
+    {% if roadmap.vision %}
+      <div class="roadmap-header__field">
+        <span class="roadmap-header__label">Vision</span>
+        <span class="roadmap-header__value">{{ roadmap.vision }}</span>
+      </div>
+    {% endif %}
+
+    {# Tag lists — headings double as swim lane selectors; one edit control #}
+    <div style="position:relative; margin-top:0.75rem; grid-column:1 / -1;">
+      <button type="button" class="roadmap-header__add no-export" @click="openManage()"
+              title="Manage objectives, outcomes & teams" aria-label="Manage tags"
+              style="position:absolute; top:1rem; right:0;">&#9998;</button>
+
+      <div class="roadmap-header__tags" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="roadmap-header__tag-group">
+          <a href="?group_by={{ objective_type }}&time_scale={{ time_scale }}"
+             class="roadmap-header__label roadmap-header__label--link {% if group_by == objective_type %}roadmap-header__label--active{% endif %}">
+            {{ objective_label }}
+          </a>
+          <div class="roadmap-header__pills">
+            {% for tag in roadmap_objective_tags %}
+              <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
+            {% empty %}
+              <span style="font-size:12px; color:var(--text-muted);">None yet</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="roadmap-header__tag-group">
+          <a href="?group_by=outcome&time_scale={{ time_scale }}"
+             class="roadmap-header__label roadmap-header__label--link {% if group_by == 'outcome' %}roadmap-header__label--active{% endif %}">
+            Defra Outcomes
+          </a>
+          <div class="roadmap-header__pills">
+            {% for tag in roadmap_outcome_tags %}
+              <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
+            {% empty %}
+              <span style="font-size:12px; color:var(--text-muted);">None yet</span>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="roadmap-header__tag-group">
+          <a href="?group_by=organisation&time_scale={{ time_scale }}"
+             class="roadmap-header__label roadmap-header__label--link {% if group_by == 'organisation' %}roadmap-header__label--active{% endif %}">
+            Teams
+          </a>
+          <div class="roadmap-header__pills">
+            {% for tag in roadmap_org_tags %}
+              <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
+            {% empty %}
+              <span style="font-size:12px; color:var(--text-muted);">None yet</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Toolbar ─────────────────────────────────────────────────── #}
+  <div class="gantt-toolbar">
+    <div class="gantt-toolbar__group">
+      <span class="gantt-toolbar__label">View by</span>
+      <a href="?group_by={{ group_by }}&time_scale=months{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+         class="btn btn-ghost {% if time_scale == 'months' %}btn-ghost--active{% endif %}">Months</a>
+      <a href="?group_by={{ group_by }}&time_scale=quarters{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+         class="btn btn-ghost {% if time_scale == 'quarters' %}btn-ghost--active{% endif %}">Quarters</a>
+      <a href="?group_by={{ group_by }}&time_scale=hybrid{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+         class="btn btn-ghost {% if time_scale == 'hybrid' %}btn-ghost--active{% endif %}">Hybrid</a>
+    </div>
+    <div class="gantt-toolbar__group no-export" id="category-filters">
+      <span class="gantt-toolbar__label">Item Category</span>
+      <a href="?group_by={{ group_by }}&time_scale={{ time_scale }}"
+         class="btn btn-ghost {% if not selected_categories_str %}btn-ghost--active{% endif %}">All</a>
+      {% for tag in roadmap_category_tags %}
+      <a href="javascript:void(0);"
+         onclick="toggleCategoryFilter({{ tag.pk }}, '{{ group_by }}', '{{ time_scale }}');"
+         class="btn btn-ghost {% if tag.pk in selected_category_ids %}btn-ghost--active{% endif %}"
+         data-category-id="{{ tag.pk }}">{{ tag.name }}</a>
+      {% empty %}
+      <span style="font-size:12px; color:var(--text-muted);">None created yet</span>
+      {% endfor %}
+    </div>
+    <script>
+    function toggleCategoryFilter(categoryId, groupBy, timeScale) {
+      const current = '{{ selected_categories_str }}'.split(',').filter(id => id.length > 0);
+      const idStr = categoryId.toString();
+      if (current.includes(idStr)) current.splice(current.indexOf(idStr), 1);
+      else current.push(idStr);
+      const param = current.length > 0 ? '&categories=' + current.join(',') : '';
+      window.location.href = '?group_by=' + groupBy + '&time_scale=' + timeScale + param;
+    }
+    </script>
+  </div>
+
+  {# ── Legend ──────────────────────────────────────────────────── #}
+  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center;">
+    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Legend</span>
+    <span class="gantt-bar gantt-bar--activity" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Activity</span>
+    <span class="gantt-bar gantt-bar--milestone" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Milestone</span>
+    <span class="gantt-bar gantt-bar--metric" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Metric</span>
+    <span style="font-size:11px; color:var(--text-muted); margin-left:.5rem;">Priority border: </span>
+    <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-low); display:inline-block;" title="Low"></span>
+    <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-medium); display:inline-block;" title="Medium"></span>
+    <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-high); display:inline-block;" title="High"></span>
+    <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-critical); display:inline-block;" title="Critical"></span>
+  </div>
+
+  {# ── No items notice ─────────────────────────────────────────── #}
+  {% if not lanes %}
+    <div class="empty-state">
+      <p>This roadmap has no items yet.</p>
+      <button type="button" class="btn btn-primary no-export" style="margin-top:1rem;" @click="openNewItem()">Add an item</button>
+    </div>
+  {% else %}
+
+  {# ── Gantt chart ─────────────────────────────────────────────── #}
+  <div class="gantt-wrapper">
+    <div class="gantt" style="min-width: {{ gantt_min_width_px }}px;">
+      <div class="gantt-header-label">
+        <select onchange="window.location.href = '?group_by=' + this.value + '&time_scale={{ time_scale }}';"
+                style="background: transparent; border: none; color: var(--text-main); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0 16px 0 0; appearance: none;">
+          <option value="outcome" {% if group_by == 'outcome' %}selected{% endif %}>Defra Outcomes</option>
+          <option value="{{ objective_type }}" {% if group_by == objective_type %}selected{% endif %}>{{ objective_label }}</option>
+          <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Teams</option>
+        </select>
+      </div>
+      <div class="gantt-header-months">
+        {% for month in months %}
+          <div class="gantt-month-cell" style="width: {{ month.width_pct }}%;">{{ month.label }}</div>
+        {% endfor %}
+      </div>
+
+      {% for lane in lanes %}
+        {% with track=lane.tracks.metrics %}
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);">
+          <span class="gantt-lane-name">{{ lane.name }}</span>
+          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Metrics</span>
+        </div>
+        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);">
+          <div class="gantt-track__grid">
+            {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
+          </div>
+          {% for bar in track.bars %}
+            <div class="gantt-bar gantt-bar--metric" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+                 @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}">{{ bar.item.title }}</div>
+          {% endfor %}
+          {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
+        </div>
+        {% endwith %}
+
+        {% with track=lane.tracks.milestones %}
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);">
+          <span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>
+          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Milestones</span>
+        </div>
+        <div class="gantt-track gantt-track--milestones" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);">
+          <div class="gantt-track__grid">
+            {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
+          </div>
+          {% for bar in track.bars %}
+            <div class="gantt-milestone-marker" style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
+                 @click="openModal({{ bar.item.pk }})">
+              <div class="gantt-milestone-marker__diamond"></div>
+              <div class="gantt-milestone-marker__label">{{ bar.item.title }}</div>
+            </div>
+          {% endfor %}
+          {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
+        </div>
+        {% endwith %}
+
+        {% with track=lane.tracks.activities %}
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle); border-bottom:2px solid var(--border-mid);">
+          <span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>
+          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Activities</span>
+        </div>
+        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2); border-bottom:2px solid var(--border-mid);">
+          <div class="gantt-track__grid">
+            {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
+          </div>
+          {% for bar in track.bars %}
+            <div class="gantt-bar gantt-bar--activity {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+                 style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+                 @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}">{{ bar.item.title }}</div>
+          {% endfor %}
+          {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
+        </div>
+        {% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  </div>{# end #roadmap-export #}
+
+  {% include "roadmap/_modals.html" %}
+
+</div>{# end x-data #}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.ITEM_DATA = {{ item_data_json|safe }};
+  window.TAG_INFO = {{ tag_data_json|safe }};
+  window.ROADMAP = {{ roadmap_json|safe }};
+  window.MANAGE = {{ manage_json|safe }};
+  window.ITEM_TAG_POOLS = {{ item_tag_pools_json|safe }};
+  window.OBJECTIVE_TYPE = {{ objective_type_json|safe }};
+  window.ACTIVITIES = {{ activities_json|safe }};
+  window.ORG_OPTIONS = [{% for org in organisations %}{"id": {{ org.pk }}, "name": "{{ org.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="{% static 'js/export.js' %}"></script>
+<script src="{% static 'js/roadmap-app.js' %}"></script>
+{% endblock %}
