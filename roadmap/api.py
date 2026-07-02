@@ -26,6 +26,7 @@ def tag_to_dict(t):
         'tag_type_display': t.get_tag_type_display(),
         'colour': t.colour,
         'description': t.description,
+        'link': t.link,
         'roadmap': t.roadmap_id,
     }
 
@@ -98,6 +99,17 @@ def _valid_tag_ids(ids):
     return ids
 
 
+def _sync_roadmap_membership(item):
+    """Tags assigned to an item also join the roadmap's header membership
+    (objectives / gov objectives / outcomes / teams), so the header reflects
+    what's actually in use. Categories are item-only filters and are excluded.
+    Additive only — removing a tag from an item never removes it from the
+    roadmap (use the manage-tags modal for that)."""
+    member_tags = list(item.tags.exclude(tag_type=Tag.CATEGORY))
+    if member_tags:
+        item.roadmap.tags.add(*member_tags)
+
+
 # ── Organisations ─────────────────────────────────────────────────────────────
 
 @require_http_methods(['GET'])
@@ -162,14 +174,34 @@ def tag_detail(request, pk):
     data = _json_body(request)
     if data is None:
         return _error('Invalid JSON body')
-    if 'name' in data and data['name']:
+    # Names are only editable for roadmap-scoped tags (Teams, Objectives).
+    # Central tags (Defra Outcomes, Gov Objectives, Categories) are shared and
+    # admin-defined, so their names are locked even if a name is sent.
+    if 'name' in data and data['name'] and tag.tag_type in Tag.SCOPED_TYPES:
         tag.name = data['name'].strip()
     if 'colour' in data and data['colour']:
         tag.colour = data['colour']
     if 'description' in data:
         tag.description = (data['description'] or '').strip()
+    if 'link' in data:
+        tag.link = (data['link'] or '').strip()
     tag.save()
     return JsonResponse(tag_to_dict(tag))
+
+
+@require_http_methods(['POST'])
+def tags_reorder(request):
+    """Persist a new swim-lane order. Body: {"ids": [tagId, ...]} in the desired
+    top-to-bottom order; each tag's sort_order is set to its index."""
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    ids = data.get('ids')
+    if not isinstance(ids, list):
+        return _error('"ids" must be a list of tag ids')
+    for index, tag_id in enumerate(ids):
+        Tag.objects.filter(pk=tag_id).update(sort_order=index)
+    return JsonResponse({'ok': True, 'count': len(ids)})
 
 
 # ── Roadmaps ──────────────────────────────────────────────────────────────────
@@ -276,6 +308,7 @@ def items_collection(request, roadmap_pk):
     except ValueError as exc:
         item.delete()
         return _error(str(exc))
+    _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
     return JsonResponse(item_to_dict(item), status=201)
@@ -302,6 +335,7 @@ def item_detail(request, pk):
             item.tags.set(_valid_tag_ids(data['tags']))
         except ValueError as exc:
             return _error(str(exc))
+        _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
     return JsonResponse(item_to_dict(item))

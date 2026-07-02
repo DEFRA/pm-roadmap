@@ -11,6 +11,7 @@ urlpatterns = [
     # ── JSON API (backs the in-page modals) ──
     path('api/organisations/', api.organisations, name='api_organisations'),
     path('api/tags/', api.tags_collection, name='api_tags'),
+    path('api/tags/reorder/', api.tags_reorder, name='api_tags_reorder'),
     path('api/tags/<int:pk>/', api.tag_detail, name='api_tag'),
     path('api/roadmaps/', api.roadmaps_collection, name='api_roadmaps'),
     path('api/roadmaps/<int:pk>/', api.roadmap_detail, name='api_roadmap'),

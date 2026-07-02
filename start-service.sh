@@ -10,4 +10,5 @@ else
   echo "DJANGO_SUPERUSER_PASSWORD is not set; skipping admin user creation"
 fi
 
-python manage.py runserver 8085
+# TODO: replace this with a non-dev mode server
+exec python manage.py runserver 8085

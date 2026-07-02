@@ -87,22 +87,73 @@
   </div>
 </template>
 
-{# ── Tag info modal (view + edit description) ──────────────────── #}
+{# ── Tag info modal (view by default; edit on pencil) ──────────── #}
 <template x-if="activeTag">
   <div class="modal-overlay" @click.self="closeTagModal()">
     <div class="modal-card" style="max-width:420px;">
       <button class="modal-close" @click="closeTagModal()" aria-label="Close">&times;</button>
+
+      {# Edit affordance — only in view mode #}
+      <button type="button" x-show="!tagEditing" @click="startTagEdit()"
+              class="btn btn-ghost" style="position:absolute; top:48px; right:16px; font-size:14px; padding:2px 8px; line-height:1;"
+              title="Edit" aria-label="Edit">&#9998;</button>
+
       <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px;" x-text="activeTag.type_label"></div>
-      <div class="modal-card__title" style="display:flex; align-items:center; gap:8px; margin-bottom:1rem;">
-        <span style="display:inline-block; width:12px; height:12px; border-radius:3px;" :style="'background:' + activeTag.colour + '; border:1px solid ' + activeTag.colour"></span>
-        <span x-text="activeTag.name"></span>
-      </div>
-      <label class="modal-card__section-label">Description</label>
-      <textarea x-model="tagInfoDraft" rows="4" placeholder="Add a description of what this is…" class="form-input"></textarea>
-      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-        <button type="button" class="btn btn-primary" @click="saveTagInfo()" :disabled="tagInfoSaving" x-text="tagInfoSaving ? 'Saving…' : 'Save'"></button>
-        <button type="button" class="btn btn-ghost" @click="closeTagModal()">Cancel</button>
-      </div>
+
+      {# ── VIEW MODE ── #}
+      <template x-if="!tagEditing">
+        <div>
+          <div class="modal-card__title" style="display:flex; align-items:center; gap:8px; margin-bottom:1rem;">
+            <span style="display:inline-block; width:12px; height:12px; border-radius:3px;" :style="'background:' + activeTag.colour + '; border:1px solid ' + activeTag.colour"></span>
+            <span x-text="activeTag.name"></span>
+          </div>
+
+          <div class="modal-card__section">
+            <div class="modal-card__section-label">More information</div>
+            <a x-show="activeTag.link" class="modal-card__link" :href="activeTag.link" target="_blank" rel="noopener" x-text="activeTag.link"></a>
+            <div x-show="!activeTag.link" class="modal-card__section-value" style="color:var(--text-muted); font-style:italic;">No link added yet.</div>
+          </div>
+
+          <div class="modal-card__section">
+            <div class="modal-card__section-label">Description</div>
+            <div class="modal-card__section-value" x-show="activeTag.description" x-text="activeTag.description"></div>
+            <div class="modal-card__section-value" x-show="!activeTag.description" style="color:var(--text-muted); font-style:italic;">No description added yet.</div>
+          </div>
+        </div>
+      </template>
+
+      {# ── EDIT MODE ── #}
+      <template x-if="tagEditing">
+        <div>
+          <div class="modal-card__title" style="display:flex; align-items:center; gap:8px; margin-bottom:1rem;">
+            <span style="display:inline-block; width:12px; height:12px; border-radius:3px;" :style="'background:' + activeTag.colour + '; border:1px solid ' + activeTag.colour"></span>
+            <span x-show="!activeTag.name_editable" x-text="activeTag.name"></span>
+            <span x-show="activeTag.name_editable" style="font-size:13px; color:var(--text-muted); font-weight:400;">Editing…</span>
+          </div>
+
+          <template x-if="activeTag.name_editable">
+            <div class="modal-card__section">
+              <label class="modal-card__section-label">Name</label>
+              <input x-model="tagNameDraft" type="text" class="form-input" />
+            </div>
+          </template>
+
+          <div class="modal-card__section">
+            <label class="modal-card__section-label">More information (link)</label>
+            <input x-model="tagLinkDraft" type="url" placeholder="https://…" class="form-input" />
+          </div>
+
+          <div class="modal-card__section">
+            <label class="modal-card__section-label">Description</label>
+            <textarea x-model="tagInfoDraft" rows="4" placeholder="Add a description of what this is…" class="form-input"></textarea>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+            <button type="button" class="btn btn-primary" @click="saveTagInfo()" :disabled="tagInfoSaving" x-text="tagInfoSaving ? 'Saving…' : 'Save'"></button>
+            <button type="button" class="btn btn-ghost" @click="cancelTagEdit()">Cancel</button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>

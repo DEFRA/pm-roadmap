@@ -66,10 +66,42 @@ class TagApiTests(ApiTestCase):
         self.outcome.refresh_from_db()
         self.assertEqual(self.outcome.description, 'hello')
 
+    def test_update_link(self):
+        res = self.put(f'/api/tags/{self.outcome.pk}/', {'link': 'https://example.com'})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()['link'], 'https://example.com')
+        self.outcome.refresh_from_db()
+        self.assertEqual(self.outcome.link, 'https://example.com')
+
+    def test_scoped_tag_name_editable(self):
+        res = self.put(f'/api/tags/{self.team.pk}/', {'name': 'Renamed Team'})
+        self.assertEqual(res.status_code, 200)
+        self.team.refresh_from_db()
+        self.assertEqual(self.team.name, 'Renamed Team')
+
+    def test_central_tag_name_locked(self):
+        # Sending a name for a central (outcome) tag must be ignored.
+        res = self.put(f'/api/tags/{self.outcome.pk}/', {'name': 'Hacked Name'})
+        self.assertEqual(res.status_code, 200)
+        self.outcome.refresh_from_db()
+        self.assertEqual(self.outcome.name, 'Grow Revenue')
+
     def test_delete_tag(self):
         res = self.client.delete(f'/api/tags/{self.team.pk}/')
         self.assertEqual(res.status_code, 204)
         self.assertFalse(Tag.objects.filter(pk=self.team.pk).exists())
+
+    def test_reorder_sets_sort_order(self):
+        a = Tag.objects.create(name='A out', tag_type=Tag.OUTCOME)
+        b = Tag.objects.create(name='B out', tag_type=Tag.OUTCOME)
+        c = Tag.objects.create(name='C out', tag_type=Tag.OUTCOME)
+        res = self.post('/api/tags/reorder/', {'ids': [c.pk, a.pk, b.pk]})
+        self.assertEqual(res.status_code, 200)
+        c.refresh_from_db(); a.refresh_from_db(); b.refresh_from_db()
+        self.assertEqual((c.sort_order, a.sort_order, b.sort_order), (0, 1, 2))
+
+    def test_reorder_requires_list(self):
+        self.assertEqual(self.post('/api/tags/reorder/', {'ids': 'nope'}).status_code, 400)
 
 
 class RoadmapApiTests(ApiTestCase):
@@ -132,6 +164,24 @@ class ItemApiTests(ApiTestCase):
     def test_delete_item(self):
         item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='Del')
         self.assertEqual(self.client.delete(f'/api/items/{item.pk}/').status_code, 204)
+
+    def test_item_tags_join_roadmap_membership_excluding_categories(self):
+        category = Tag.objects.create(name='Discovery', tag_type=Tag.CATEGORY)
+        self.assertEqual(self.group.tags.count(), 0)
+        self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'Tagged',
+            'tags': [self.outcome.pk, self.team.pk, category.pk],
+        })
+        member_ids = set(self.group.tags.values_list('pk', flat=True))
+        # Outcome + team join the header; the category does not.
+        self.assertIn(self.outcome.pk, member_ids)
+        self.assertIn(self.team.pk, member_ids)
+        self.assertNotIn(category.pk, member_ids)
+
+    def test_updating_item_tags_adds_to_membership(self):
+        item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='U')
+        self.put(f'/api/items/{item.pk}/', {'tags': [self.outcome.pk]})
+        self.assertIn(self.outcome.pk, set(self.group.tags.values_list('pk', flat=True)))
 
 
 class CsrfTests(TestCase):

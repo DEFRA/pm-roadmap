@@ -49,25 +49,46 @@ function roadmapApp() {
     },
     closeModal() { this.activeItem = null; },
 
-    // ── tag info modal (view + edit description) ──
+    // ── tag info modal (view by default; edit on pencil) ──
     activeTag: null,
     activeTagId: null,
+    tagEditing: false,
     tagInfoDraft: '',
+    tagLinkDraft: '',
+    tagNameDraft: '',
     tagInfoSaving: false,
     openTagModal(id) {
       this.activeItem = null;
       this.activeTag = window.TAG_INFO[id] || null;
       this.activeTagId = id;
-      this.tagInfoDraft = this.activeTag ? (this.activeTag.description || '') : '';
+      this.tagEditing = false;
+      this._resetTagDrafts();
     },
-    closeTagModal() { this.activeTag = null; },
+    _resetTagDrafts() {
+      const t = this.activeTag || {};
+      this.tagInfoDraft = t.description || '';
+      this.tagLinkDraft = t.link || '';
+      this.tagNameDraft = t.name || '';
+      this.tagInfoSaving = false;
+    },
+    startTagEdit() { this._resetTagDrafts(); this.tagEditing = true; },
+    cancelTagEdit() { this.tagEditing = false; this._resetTagDrafts(); },
+    closeTagModal() { this.activeTag = null; this.tagEditing = false; },
     async saveTagInfo() {
       this.tagInfoSaving = true;
+      const payload = {
+        description: this.tagInfoDraft.trim(),
+        link: this.tagLinkDraft.trim(),
+      };
+      // Name is only sent (and only honoured server-side) for scoped types.
+      if (this.activeTag && this.activeTag.name_editable) {
+        payload.name = this.tagNameDraft.trim();
+      }
       try {
-        await apiFetch(`/api/tags/${this.activeTagId}/`, 'PUT', { description: this.tagInfoDraft.trim() });
+        await apiFetch(`/api/tags/${this.activeTagId}/`, 'PUT', payload);
         window.location.reload();
       } catch (e) {
-        alert('Failed to save description: ' + e.message);
+        alert('Failed to save: ' + e.message);
         this.tagInfoSaving = false;
       }
     },
