@@ -20,7 +20,7 @@ class TagAdmin(admin.ModelAdmin):
     list_display = ['name', 'tag_type', 'roadmap', 'colour']
     list_filter = ['tag_type', 'roadmap']
     search_fields = ['name']
-    fields = ['name', 'tag_type', 'roadmap', 'colour', 'description']
+    fields = ['name', 'tag_type', 'roadmap', 'colour', 'description', 'link']
 
 
 class ItemInline(admin.TabularInline):

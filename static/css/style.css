@@ -231,7 +231,8 @@ nav {
 
 /* ─── Gantt wrapper ──────────────────────────────────────────── */
 .gantt-wrapper {
-  overflow-x: auto;
+  overflow: auto;                     /* scroll both axes inside the pane */
+  max-height: calc(100vh - 40px);     /* so row 1 can stay pinned on scroll */
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -260,7 +261,8 @@ nav {
   letter-spacing: 0.08em;
   position: sticky;
   left: 0;
-  z-index: 21;
+  top: 0;               /* A1 corner: frozen in both directions */
+  z-index: 30;
 }
 
 .gantt-header-label select {
@@ -281,7 +283,9 @@ nav {
   border-bottom: 1px solid var(--border-subtle);
   height: var(--gantt-header-h);
   display: flex;
-  position: relative;
+  position: sticky;
+  top: 0;               /* row 1: frozen on vertical scroll */
+  z-index: 15;
 }
 
 .gantt-month-cell {
@@ -316,6 +320,35 @@ nav {
   font-weight: 600;
   color: var(--text-main);
 }
+
+/* ─── Swim-lane drag handle + reorder feedback ───────────────── */
+.gantt-lane__handle {
+  position: absolute;
+  top: 8px;
+  left: 1px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: grab;
+  opacity: 0;
+  padding: 2px 1px;
+  transition: opacity 0.12s;
+  user-select: none;
+  touch-action: none;   /* pointer drag, not scroll */
+}
+/* Reveal on hover of the lane (or at least its label cell). */
+.gantt-lane:hover .gantt-lane__handle,
+.gantt-lane-label:hover .gantt-lane__handle { opacity: 0.55; }
+.gantt-lane__handle:hover { opacity: 1; }
+
+/* Highlight the lane being dragged. */
+.gantt-lane--dragging .gantt-lane-label { background: #e3eefc; }
+.gantt-lane--dragging .gantt-track { background: rgba(29, 112, 184, 0.07); }
+.gantt-lane--dragging .gantt-lane__handle { opacity: 1; cursor: grabbing; }
+
+/* While dragging, lock the cursor and stop text selection everywhere. */
+body.gantt-reordering { user-select: none; }
+body.gantt-reordering * { cursor: grabbing !important; }
 
 .gantt-lane-tracks {
   border-bottom: 1px solid var(--border-subtle);
@@ -373,6 +406,16 @@ nav {
   z-index: 2;
 }
 .gantt-bar:hover { filter: brightness(1.15); transform: scaleY(1.05); }
+
+/* Bar label truncates with an ellipsis when the title is wider than the bar.
+   min-width:0 lets this flex child shrink below its content width so that
+   text-overflow can kick in. */
+.gantt-bar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .gantt-bar--activity  { background: var(--color-activity);  color: #fff; }
 .gantt-bar--milestone { background: var(--color-milestone); color: #fff; }

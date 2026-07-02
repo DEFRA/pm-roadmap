@@ -7,7 +7,5 @@ dbs:
     replica:
       type: s3
       url: ${BUCKET_URL}
-      #url: s3://sqlite/pm-roadmap/db.sqlite?endpoint=http://localhost:4566&region=eu-west-2&force-path-style=true&skip-verify=true
 
-sync-interval: 10s
 

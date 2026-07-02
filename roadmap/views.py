@@ -39,7 +39,9 @@ def roadmap_list(request):
 @ensure_csrf_cookie
 def roadmap_detail(request, pk):
     roadmap = get_object_or_404(Roadmap, pk=pk)
-    group_by = request.GET.get('group_by', 'outcome')
+    # Default swimlane view is resolved after the roadmap type is known (below):
+    # group roadmaps default to Defra Outcomes, service roadmaps to Objectives.
+    group_by = request.GET.get('group_by')
     time_scale = request.GET.get('time_scale', 'months')
     selected_categories_str = request.GET.get('categories', '')
 
@@ -91,6 +93,11 @@ def roadmap_detail(request, pk):
     objective_type = Tag.OBJECTIVE if is_service else Tag.GOV_OBJECTIVE
     objective_label = 'Objectives' if is_service else 'Gov Objectives'
     objective_creatable = is_service
+
+    # Default view when none is requested: service roadmaps open on Objectives,
+    # group roadmaps on Defra Outcomes.
+    if not group_by:
+        group_by = objective_type if is_service else Tag.OUTCOME
 
     # Build swimlanes using the virtual timeline for bar positioning
     tag_type_map = {
@@ -198,6 +205,8 @@ def roadmap_detail(request, pk):
                 'type_label': type_labels.get(t.tag_type, t.tag_type),
                 'colour': t.colour,
                 'description': t.description,
+                'link': t.link,
+                'name_editable': t.tag_type in Tag.SCOPED_TYPES,
             }
             for t in roadmap_tags
         }),
@@ -397,6 +406,50 @@ def _stack_bars(bars):
     return bars, len(rows)
 
 
+# Milestone label geometry — used to detect label overlap. Milestones are a
+# single point, so their diamonds rarely overlap, but the labels beneath them
+# (centred on the date) do. We estimate each label's footprint from its
+# character count and stack overlapping ones onto separate rows.
+_MS_LABEL_MAX_CHARS = 24          # keep in sync with truncatechars in the template
+_MS_LABEL_PX_PER_CHAR = 5.6       # ~average glyph width at the 9px label font
+_MS_LABEL_MIN_PX = 16             # diamond width floor
+_MS_LABEL_GAP_PCT = 0.4           # small breathing gap between labels on a row
+
+
+def _stack_milestones(bars, timeline_px):
+    """Stack milestones so their (centred) labels don't overlap.
+
+    Each label's horizontal footprint is estimated from its truncated length and
+    converted to a percentage of the timeline width, then treated as centred on
+    the milestone's date. Overlapping footprints are pushed to a new row — the
+    same idea as _stack_bars, but using the label width rather than the (tiny)
+    diamond width.
+    """
+    if timeline_px <= 0:
+        timeline_px = 1
+    for bar in bars:
+        chars = min(len(bar['item'].title.strip()), _MS_LABEL_MAX_CHARS)
+        label_px = max(_MS_LABEL_MIN_PX, chars * _MS_LABEL_PX_PER_CHAR)
+        half = (label_px / timeline_px * 100) / 2
+        bar['fp_left'] = bar['left_pct'] - half
+        bar['fp_right'] = bar['left_pct'] + half
+
+    bars = sorted(bars, key=lambda b: b['fp_left'])
+    rows = []  # right edge (%) currently occupied by each row
+    for bar in bars:
+        placed = False
+        for i, row_right in enumerate(rows):
+            if bar['fp_left'] >= row_right + _MS_LABEL_GAP_PCT:
+                bar['row'] = i
+                rows[i] = bar['fp_right']
+                placed = True
+                break
+        if not placed:
+            bar['row'] = len(rows)
+            rows.append(bar['fp_right'])
+    return bars, len(rows)
+
+
 def _build_swimlanes(items, tag_type, columns, total_v):
     tag_items: dict[Tag, list] = {}
     untagged = []
@@ -408,7 +461,7 @@ def _build_swimlanes(items, tag_type, columns, total_v):
             if t.tag_type == tag_type:
                 relevant_tag_ids.add(t.pk)
 
-    all_tags = Tag.objects.filter(tag_type=tag_type, pk__in=relevant_tag_ids).order_by('name')
+    all_tags = Tag.objects.filter(tag_type=tag_type, pk__in=relevant_tag_ids).order_by('sort_order', 'name')
     for tag in all_tags:
         tag_items[tag] = []
 
@@ -423,9 +476,9 @@ def _build_swimlanes(items, tag_type, columns, total_v):
 
     lanes = []
     for tag, tag_item_list in tag_items.items():
-        lanes.append(_make_lane(tag.name, tag_item_list, columns, total_v))
+        lanes.append(_make_lane(tag.name, tag_item_list, columns, total_v, tag_id=tag.pk))
     if untagged:
-        lanes.append(_make_lane('Untagged', untagged, columns, total_v))
+        lanes.append(_make_lane('Untagged', untagged, columns, total_v, tag_id=None))
     return lanes
 
 
@@ -466,7 +519,7 @@ def _serialise_items(lanes):
     return data
 
 
-def _make_lane(name, item_list, columns, total_v):
+def _make_lane(name, item_list, columns, total_v, tag_id=None):
     tracks = {'activities': [], 'milestones': [], 'metrics': []}
     for item in item_list:
         bar = _item_to_bar(item, columns, total_v)
@@ -479,9 +532,16 @@ def _make_lane(name, item_list, columns, total_v):
         elif item.item_type == Item.METRIC:
             tracks['metrics'].append(bar)
 
+    # Timeline width in px (at the gantt's minimum width) — the conservative
+    # case for label overlap, since a wider viewport only spreads things out.
+    timeline_px = total_v * _BASE_PX_PER_UNIT
+
     stacked_tracks = {}
     for track_name, bars in tracks.items():
-        stacked, row_count = _stack_bars(bars)
+        if track_name == 'milestones':
+            stacked, row_count = _stack_milestones(bars, timeline_px)
+        else:
+            stacked, row_count = _stack_bars(bars)
         stacked_tracks[track_name] = {'bars': stacked, 'row_count': max(row_count, 1)}
 
-    return {'name': name, 'tracks': stacked_tracks}
+    return {'name': name, 'tag_id': tag_id, 'tracks': stacked_tracks}

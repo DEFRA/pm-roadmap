@@ -61,6 +61,8 @@ class Tag(models.Model):
     tag_type = models.CharField(max_length=20, choices=TAG_TYPE_CHOICES)
     colour = models.CharField(max_length=7, default=random_tag_colour, help_text='Hex colour, e.g. #1d70b8')
     description = models.TextField(blank=True)
+    link = models.URLField(blank=True, help_text='Optional third-party link with more information')
+    sort_order = models.IntegerField(default=0, help_text='Manual swim-lane order (lower = higher up)')
     roadmap = models.ForeignKey(
         'Roadmap',
         on_delete=models.CASCADE,
