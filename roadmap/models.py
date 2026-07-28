@@ -128,7 +128,7 @@ class Item(models.Model):
     ITEM_TYPE_CHOICES = [
         (ACTIVITY, 'Activity'),
         (MILESTONE, 'Milestone'),
-        (METRIC, 'Metric'),
+        (METRIC, 'Key Result'),
     ]
 
     LOW = 'low'

@@ -143,7 +143,7 @@
     <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Legend</span>
     <span class="gantt-bar gantt-bar--activity" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Activity</span>
     <span class="gantt-bar gantt-bar--milestone" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Milestone</span>
-    <span class="gantt-bar gantt-bar--metric" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Metric</span>
+    <span class="gantt-bar gantt-bar--metric" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Key Result</span>
     <span style="font-size:11px; color:var(--text-muted); margin-left:.5rem;">Priority border: </span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-low); display:inline-block;" title="Low"></span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-medium); display:inline-block;" title="Medium"></span>
@@ -183,7 +183,7 @@
         <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);">
           {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
           <span class="gantt-lane-name">{{ lane.name }}</span>
-          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Metrics</span>
+          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Key Results</span>
         </div>
         <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);">
           <div class="gantt-track__grid">
