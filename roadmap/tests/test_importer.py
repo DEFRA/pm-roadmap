@@ -89,6 +89,20 @@ class ImportTests(TestCase):
         res = import_items(buf)
         self.assertEqual(res['skipped'], 1)
 
+    def test_key_result_label_imports_as_metric(self):
+        buf = make_workbook(self.rm.pk, FULL_HEADER,
+                            [self._row(title='KR One', item_type='key result')])
+        res = import_items(buf)
+        self.assertEqual((res['created'], res['skipped']), (1, 0))
+        self.assertEqual(Item.objects.get(title='KR One').item_type, Item.METRIC)
+
+    def test_legacy_metric_label_still_imports(self):
+        buf = make_workbook(self.rm.pk, FULL_HEADER,
+                            [self._row(title='Legacy KR', item_type='metric')])
+        res = import_items(buf)
+        self.assertEqual((res['created'], res['skipped']), (1, 0))
+        self.assertEqual(Item.objects.get(title='Legacy KR').item_type, Item.METRIC)
+
     def test_update_existing_item_by_title(self):
         Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Activity One')
         buf = make_workbook(self.rm.pk, FULL_HEADER, [self._row()])
