@@ -4,7 +4,9 @@ from django.shortcuts import render, redirect
 from django.urls import path, reverse
 from django.contrib import messages
 
-from .models import Tag, Roadmap, Item, Organisation
+from .models import (
+    Tag, Roadmap, Item, Organisation, Team, ObjectiveSet, Objective, KeyResult,
+)
 from .importers import import_items, build_template_workbook
 
 
@@ -121,7 +123,7 @@ class ItemAdmin(admin.ModelAdmin):
     filter_horizontal = ['tags', 'linked_activities']
     fieldsets = [
         (None, {
-            'fields': ['roadmap', 'item_type', 'title', 'description', 'tags'],
+            'fields': ['roadmap', 'item_type', 'title', 'description', 'objective', 'tags'],
         }),
         ('Activity Details', {
             'fields': ['priority', 'size', 'prd_link', 'backlog_link'],
@@ -136,3 +138,32 @@ class ItemAdmin(admin.ModelAdmin):
             'description': 'For milestones and metrics: link to related activities.',
         }),
     ]
+
+
+@admin.register(Team)
+class TeamAdmin(admin.ModelAdmin):
+    list_display = ['name', 'organisation', 'sort_order', 'created_at']
+    list_filter = ['organisation']
+    search_fields = ['name']
+    fields = ['organisation', 'name', 'mission', 'vision', 'sort_order']
+
+
+class KeyResultInline(admin.TabularInline):
+    model = KeyResult
+    extra = 1
+    fields = ['title', 'unit', 'start_value', 'current_value', 'target_value', 'direction', 'status', 'sort_order']
+
+
+@admin.register(ObjectiveSet)
+class ObjectiveSetAdmin(admin.ModelAdmin):
+    list_display = ['name', 'scope', 'organisation', 'team', 'period', 'start_date', 'end_date', 'archived']
+    list_filter = ['scope', 'organisation', 'team', 'archived']
+    search_fields = ['name']
+
+
+@admin.register(Objective)
+class ObjectiveAdmin(admin.ModelAdmin):
+    list_display = ['title', 'team', 'objective_set', 'sort_order', 'updated_at']
+    list_filter = ['team', 'objective_set']
+    search_fields = ['title', 'description']
+    inlines = [KeyResultInline]
