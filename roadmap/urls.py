@@ -1,12 +1,31 @@
 from django.urls import path
-from . import views, api
+from . import views, api, views_okr, views_team
 
 app_name = 'roadmap'
 
 urlpatterns = [
     path('', views.roadmap_list, name='list'),
-    path('<int:pk>/', views.roadmap_detail, name='detail'),
     path('health', api.health, name='health'),
+
+    # ── Standalone OKR pages ──
+    path('objectives/', views_okr.objective_list, name='objective_list'),
+    path('objectives/new/', views_okr.objective_create, name='objective_create'),
+    path('objectives/<int:pk>/edit/', views_okr.objective_edit, name='objective_edit'),
+    path('objectives/<int:pk>/delete/', views_okr.objective_delete, name='objective_delete'),
+    path('objectives/sets/new/', views_okr.objective_set_create, name='objective_set_create'),
+    path('objectives/sets/<int:pk>/', views_okr.objective_set_detail, name='objective_set_detail'),
+    path('objectives/sets/<int:pk>/edit/', views_okr.objective_set_edit, name='objective_set_edit'),
+    path('objectives/sets/<int:pk>/delete/', views_okr.objective_set_delete, name='objective_set_delete'),
+    path('objectives/sets/<int:pk>/archive/', views_okr.objective_set_archive, name='objective_set_archive'),
+    path('objectives/sets/<int:pk>/unarchive/', views_okr.objective_set_unarchive, name='objective_set_unarchive'),
+
+    # ── Team pages ──
+    path('teams/', views_team.team_list, name='team_list'),
+    path('teams/new/', views_team.team_create, name='team_create'),
+    path('teams/<int:pk>/', views_team.team_home, name='team_home'),
+    path('teams/<int:pk>/edit/', views_team.team_edit, name='team_edit'),
+
+    path('<int:pk>/', views.roadmap_detail, name='detail'),
 
     # ── JSON API (backs the in-page modals) ──
     path('api/organisations/', api.organisations, name='api_organisations'),

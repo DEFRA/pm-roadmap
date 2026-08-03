@@ -1,0 +1,25 @@
+{% extends "roadmap/base.html" %}
+{% block title %}Teams{% endblock %}
+
+{% block content %}
+<div style="max-width:820px; margin:0 auto;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+    <h1 style="margin:0;">Teams</h1>
+    <a href="{% url 'roadmap:team_create' %}" class="btn btn-primary">+ New team</a>
+  </div>
+
+  {% for team in teams %}
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem;">
+        <div>
+          <a href="{% url 'roadmap:team_home' team.pk %}" style="font-weight:600; font-size:16px;">{{ team.name }}</a>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">{{ team.organisation.name }}</div>
+        </div>
+        <a href="{% url 'roadmap:team_home' team.pk %}" class="btn btn-ghost" style="font-size:12px;">Open</a>
+      </div>
+    </div>
+  {% empty %}
+    <p style="color:var(--text-muted);">No teams yet. Create one to own objectives and roadmaps.</p>
+  {% endfor %}
+</div>
+{% endblock %}

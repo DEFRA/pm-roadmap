@@ -1,0 +1,43 @@
+{# One objective with its key results. Expects `objective`. #}
+<div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
+    <div>
+      <div style="font-weight:600;">{{ objective.title }}</div>
+      {% if objective.description %}
+        <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">{{ objective.description }}</div>
+      {% endif %}
+      {% if objective.team %}
+        <span class="tag-pill" style="font-size:10px; margin-top:6px;">{{ objective.team.name }}</span>
+      {% endif %}
+    </div>
+    <div style="display:flex; gap:6px; flex-shrink:0;">
+      <a href="{% url 'roadmap:objective_edit' objective.pk %}" class="btn btn-ghost" style="font-size:12px;">Edit</a>
+      <form method="post" action="{% url 'roadmap:objective_delete' objective.pk %}" style="margin:0;"
+            onsubmit="return confirm('Delete this objective and its key results?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px; color:var(--priority-critical);">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  {% if objective.key_results.all %}
+    <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:6px;">
+      {% for kr in objective.key_results.all %}
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px;">
+            <span>{{ kr.title }}</span>
+            <span style="color:var(--text-muted);">
+              {{ kr.current_value|floatformat:"-2" }} / {{ kr.target_value|floatformat:"-2" }}{{ kr.unit }}
+              &middot; {{ kr.get_status_display }}
+            </span>
+          </div>
+          <div style="height:6px; background:var(--border-subtle); border-radius:3px; overflow:hidden; margin-top:3px;">
+            <div style="height:100%; width:{{ kr.progress }}%; background:var(--color-metric, #00703c);"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="font-size:12px; color:var(--text-muted); margin-top:0.5rem;">No key results yet.</div>
+  {% endif %}
+</div>

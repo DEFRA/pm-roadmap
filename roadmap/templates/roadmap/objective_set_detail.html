@@ -1,0 +1,59 @@
+{% extends "roadmap/base.html" %}
+{% block title %}{{ objective_set.name }}{% endblock %}
+
+{% block content %}
+<div style="max-width:820px; margin:0 auto;">
+  <div style="font-size:12px; color:var(--text-muted); margin-bottom:0.5rem;">
+    <a href="{% url 'roadmap:objective_list' %}" style="color:inherit;">Objectives</a> &rsaquo; {{ objective_set.organisation.name }}
+    {% if objective_set.scope == 'team' and objective_set.team %}
+      &rsaquo; <a href="{% url 'roadmap:team_home' objective_set.team.pk %}" style="color:inherit;">{{ objective_set.team.name }}</a>
+    {% endif %}
+  </div>
+
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:0.5rem;">
+    <h1 style="margin:0;">
+      {{ objective_set.name }}
+      {% include "roadmap/_okr_period_pill.html" with set=objective_set %}
+      {% if objective_set.archived %}<span class="tag-pill" style="font-size:10px; border-color:var(--text-muted); color:var(--text-muted);">Archived</span>{% endif %}
+    </h1>
+    <div style="display:flex; gap:6px;">
+      <a href="{% url 'roadmap:objective_set_edit' objective_set.pk %}" class="btn btn-ghost" style="font-size:12px;">Edit set</a>
+      {% if objective_set.archived %}
+      <form method="post" action="{% url 'roadmap:objective_set_unarchive' objective_set.pk %}" style="margin:0;">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px;">Unarchive</button></form>
+      {% else %}
+      <form method="post" action="{% url 'roadmap:objective_set_archive' objective_set.pk %}" style="margin:0;">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px;">Archive</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'roadmap:objective_set_delete' objective_set.pk %}" style="margin:0;"
+            onsubmit="return confirm('Delete this set? Its objectives are kept and moved to No set.');">{% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px; color:var(--priority-critical);">Delete</button></form>
+    </div>
+  </div>
+
+  <div style="font-size:13px; color:var(--text-muted); margin-bottom:1rem;">
+    {% if objective_set.start_date or objective_set.end_date %}
+      {{ objective_set.start_date|date:"d M Y"|default:"—" }} &rarr; {{ objective_set.end_date|date:"d M Y"|default:"—" }} &middot;
+    {% endif %}
+    {{ objectives|length }} objective{{ objectives|length|pluralize }}
+  </div>
+
+  {% if roadmaps %}
+    <div style="font-size:13px; margin-bottom:1rem;">
+      <span style="color:var(--text-muted);">On roadmaps:</span>
+      {% for rm in roadmaps %}<a href="{% url 'roadmap:detail' rm.pk %}" class="tag-pill" style="font-size:11px;">{{ rm.name }}</a>{% endfor %}
+    </div>
+  {% endif %}
+
+  <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+    <a href="{% url 'roadmap:objective_create' %}?set={{ objective_set.pk }}" class="btn btn-primary" style="font-size:12px;">+ Add objective</a>
+  </div>
+
+  {% for objective in objectives %}
+    {% include "roadmap/_objective_card.html" with objective=objective %}
+  {% empty %}
+    <p style="color:var(--text-muted);">No objectives in this set yet.</p>
+    <a href="{% url 'roadmap:objective_create' %}?set={{ objective_set.pk }}" class="btn btn-primary">Add your first objective</a>
+  {% endfor %}
+</div>
+{% endblock %}
