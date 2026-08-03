@@ -9,7 +9,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 
-from .models import Roadmap, Item, Tag, Organisation
+from .models import Roadmap, Item, Tag, Organisation, Objective, KeyResult
+from .access import objective_assignable_to_roadmap
 
 
 # ── Serialisers ───────────────────────────────────────────────────────────────
@@ -45,6 +46,7 @@ def item_to_dict(i):
         'end_date': i.end_date.isoformat() if i.end_date else '',
         'prd_link': i.prd_link,
         'backlog_link': i.backlog_link,
+        'objective': i.objective_id,
         'tags': [tag_to_dict(t) for t in i.tags.all()],
         'linked_activities': [{'id': a.pk, 'title': a.title} for a in i.linked_activities.all()],
     }
@@ -284,6 +286,44 @@ def _apply_item_fields(item, data):
         item.start_date = _parse_date(data['start_date'])
     if 'end_date' in data:
         item.end_date = _parse_date(data['end_date'])
+    # Assign to an objective on this roadmap; empty unassigns. Validated against
+    # the item's roadmap so only assignable objectives can be linked.
+    if 'objective' in data:
+        obj_id = data['objective']
+        if obj_id in (None, '', 0):
+            item.objective = None
+        else:
+            objective = Objective.objects.filter(pk=obj_id).first()
+            if objective is None or not objective_assignable_to_roadmap(objective, item.roadmap):
+                raise ValueError('Invalid objective for this roadmap')
+            item.objective = objective
+
+
+def _next_kr_sort_order(objective):
+    last = objective.key_results.order_by('-sort_order').first()
+    return (last.sort_order + 1) if last else 0
+
+
+def _ensure_key_result(item, previous_title=None):
+    """Create or update the KeyResult backing a metric item on an objective.
+
+    The metric *is* the key result: the item keeps its timeline placement while
+    a KeyResult under the objective carries the measurable values. Matched by
+    title so renaming the item renames its key result rather than orphaning it.
+    """
+    objective = item.objective
+    if objective is None:
+        return None
+    lookup_title = previous_title or item.title
+    kr = KeyResult.objects.filter(objective=objective, title=lookup_title).first()
+    if kr is None:
+        kr = KeyResult.objects.create(
+            objective=objective, title=item.title, sort_order=_next_kr_sort_order(objective),
+        )
+    elif kr.title != item.title:
+        kr.title = item.title
+        kr.save(update_fields=['title'])
+    return kr
 
 
 @require_http_methods(['POST'])
@@ -311,6 +351,9 @@ def items_collection(request, roadmap_pk):
     _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    # A metric assigned to an objective is a key result — back it with one.
+    if item.item_type == Item.METRIC and item.objective_id:
+        _ensure_key_result(item)
     return JsonResponse(item_to_dict(item), status=201)
 
 
@@ -325,6 +368,7 @@ def item_detail(request, pk):
     data = _json_body(request)
     if data is None:
         return _error('Invalid JSON body')
+    previous_title = item.title
     try:
         _apply_item_fields(item, data)
     except ValueError as exc:
@@ -338,6 +382,9 @@ def item_detail(request, pk):
         _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    # Keep the backing key result in step with a metric on an objective.
+    if item.item_type == Item.METRIC and item.objective_id:
+        _ensure_key_result(item, previous_title=previous_title)
     return JsonResponse(item_to_dict(item))
 
 
