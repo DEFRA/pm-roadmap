@@ -220,7 +220,7 @@
       <template x-for="section in [
           {type: manage.objective_type, label: manage.objective_label, creatable: manage.objective_creatable},
           {type: 'outcome', label: 'Defra Outcomes', creatable: false},
-          {type: 'organisation', label: 'Teams', creatable: true}
+          {type: 'organisation', label: 'Squads', creatable: true}
         ]" :key="section.type">
         <div style="margin-bottom:1.5rem;">
           <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;" x-text="section.label"></div>
@@ -325,7 +325,7 @@
       <template x-for="section in [
           {type: 'outcome', label: 'Defra Outcomes', creatable: false},
           {type: objectiveType, label: objectiveType === 'objective' ? 'Objectives' : 'Gov Objectives', creatable: objectiveType === 'objective'},
-          {type: 'organisation', label: 'Teams', creatable: true},
+          {type: 'organisation', label: 'Squads', creatable: true},
           {type: 'category', label: 'Item Categories', creatable: true}
         ]" :key="section.type">
         <div class="modal-card__section">

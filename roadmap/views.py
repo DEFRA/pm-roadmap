@@ -105,10 +105,15 @@ def roadmap_detail(request, pk):
         'gov_objective': Tag.GOV_OBJECTIVE,
         'objective': Tag.OBJECTIVE,
     }
-    tag_type = tag_type_map.get(group_by, Tag.OUTCOME)
     if group_by not in tag_type_map and group_by != 'outcome':
         group_by = 'outcome'
-    lanes = _build_swimlanes(items, tag_type, columns, total_v)
+    if group_by == 'objective':
+        # Objectives are first-class entities (not tags): lanes come from the
+        # objectives synced/linked to this roadmap; items sit under item.objective.
+        lanes = _build_objective_swimlanes(roadmap, items, columns, total_v)
+    else:
+        tag_type = tag_type_map.get(group_by, Tag.OUTCOME)
+        lanes = _build_swimlanes(items, tag_type, columns, total_v)
 
     item_data = _serialise_items(lanes)
 
@@ -479,6 +484,32 @@ def _build_swimlanes(items, tag_type, columns, total_v):
         lanes.append(_make_lane(tag.name, tag_item_list, columns, total_v, tag_id=tag.pk))
     if untagged:
         lanes.append(_make_lane('Untagged', untagged, columns, total_v, tag_id=None))
+    return lanes
+
+
+def _build_objective_swimlanes(roadmap, items, columns, total_v):
+    """Swim lanes grouped by Objective entity (see roadmap/access.py for which
+    objectives are on a roadmap). Items sit in the lane of their item.objective;
+    anything unassigned falls into an 'Unassigned' lane."""
+    from . import access
+    from .models import Objective
+
+    obj_ids = access.roadmap_objective_ids(roadmap)
+    objectives = list(Objective.objects.filter(pk__in=obj_ids).order_by('sort_order', 'title'))
+    obj_items = {o.pk: [] for o in objectives}
+    untagged = []
+    for item in items:
+        if item.objective_id in obj_items:
+            obj_items[item.objective_id].append(item)
+        else:
+            untagged.append(item)
+
+    lanes = [
+        _make_lane(o.title, obj_items[o.pk], columns, total_v, tag_id=None)
+        for o in objectives
+    ]
+    if untagged:
+        lanes.append(_make_lane('Unassigned', untagged, columns, total_v, tag_id=None))
     return lanes
 
 

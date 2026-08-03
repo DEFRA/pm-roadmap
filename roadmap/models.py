@@ -77,10 +77,10 @@ class Tag(models.Model):
         (OUTCOME, 'Defra Outcome'),
         (GOV_OBJECTIVE, 'Gov Objective'),
         (OBJECTIVE, 'Objective'),
-        (ORGANISATION, 'Team'),
+        (ORGANISATION, 'Squad'),
         (CATEGORY, 'Item Category'),
     ]
-    # Roadmap-scoped types (organisation/Teams, objective/Service objectives) set
+    # Roadmap-scoped types (organisation/Squads, objective/Service objectives) set
     # this to the owning roadmap. Central types (gov_objective, outcome, category)
     # leave it null and are shared across all roadmaps.
     SCOPED_TYPES = (ORGANISATION, OBJECTIVE)
@@ -97,7 +97,12 @@ class Tag(models.Model):
         null=True,
         blank=True,
         related_name='scoped_tags',
-        help_text='Set for roadmap-scoped tags (teams, objectives); null for central tags.',
+        help_text='Set for roadmap-scoped tags (squads, objectives); null for central tags.',
+    )
+    # For squad tags (tag_type=organisation): the higher-level Team this squad
+    # rolls up to. Null for other tag types and unmigrated squads.
+    team = models.ForeignKey(
+        'Team', on_delete=models.SET_NULL, null=True, blank=True, related_name='squad_tags',
     )
 
     class Meta:

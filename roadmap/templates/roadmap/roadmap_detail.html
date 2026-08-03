@@ -53,7 +53,7 @@
     {# Tag lists — headings double as swim lane selectors; one edit control #}
     <div style="position:relative; margin-top:0.75rem; grid-column:1 / -1;">
       <button type="button" class="roadmap-header__add no-export" @click="openManage()"
-              title="Manage objectives, outcomes & teams" aria-label="Manage tags"
+              title="Manage objectives, outcomes & squads" aria-label="Manage tags"
               style="position:absolute; top:1rem; right:0;">&#9998;</button>
 
       <div class="roadmap-header__tags" style="grid-template-columns:1fr 1fr 1fr;">
@@ -88,7 +88,7 @@
         <div class="roadmap-header__tag-group">
           <a href="?group_by=organisation&time_scale={{ time_scale }}"
              class="roadmap-header__label roadmap-header__label--link {% if group_by == 'organisation' %}roadmap-header__label--active{% endif %}">
-            Teams
+            Squads
           </a>
           <div class="roadmap-header__pills">
             {% for tag in roadmap_org_tags %}
@@ -167,7 +167,7 @@
                 style="background-color: transparent; border: none; color: var(--text-main); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0 16px 0 0; appearance: none; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22%3E%3Cpath fill=%22%23111111%22 d=%22M6 8L0 0h12z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right center;">
           <option value="outcome" {% if group_by == 'outcome' %}selected{% endif %}>Defra Outcomes</option>
           <option value="{{ objective_type }}" {% if group_by == objective_type %}selected{% endif %}>{{ objective_label }}</option>
-          <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Teams</option>
+          <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Squads</option>
         </select>
       </div>
       <div class="gantt-header-months">
