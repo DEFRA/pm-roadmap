@@ -45,6 +45,19 @@ def roadmap_detail(request, pk):
     time_scale = request.GET.get('time_scale', 'months')
     selected_categories_str = request.GET.get('categories', '')
 
+    # Item-type (sub-lane) visibility filter. Absent / all three selected = show all.
+    ALL_TRACKS = ['metric', 'milestone', 'activity']
+    selected_tracks = [t for t in request.GET.get('tracks', '').split(',') if t in ALL_TRACKS]
+    if len(set(selected_tracks)) == len(ALL_TRACKS):
+        selected_tracks = []  # all selected == no filter
+    selected_tracks_str = ','.join(selected_tracks)
+    visible_tracks = set(selected_tracks) if selected_tracks else set(ALL_TRACKS)
+    # Sub-lanes render in this order; the lane name/handle sits on the first
+    # visible one and the lane-separator border on the last visible one.
+    _track_order = ['metric', 'milestone', 'activity']
+    first_visible_track = next((t for t in _track_order if t in visible_tracks), None)
+    last_visible_track = next((t for t in reversed(_track_order) if t in visible_tracks), None)
+
     items = roadmap.items.prefetch_related('tags', 'linked_activities').all()
 
     # Parse and filter by multiple categories if selected (comma-separated IDs)
@@ -58,26 +71,63 @@ def roadmap_detail(request, pk):
         except (ValueError, Tag.DoesNotExist):
             selected_category_ids = []
 
-    # Timeline always starts at the current month (or quarter start for quarters view)
+    # ── Timeline window ──────────────────────────────────────────────────────
+    # Default: start of the current quarter → end of the quarter containing the
+    # last-ending item (or synced set). The user can override with ?start / ?end,
+    # constrained to one year back and ten years forward from today.
     today = date.today()
-    if time_scale == 'quarters':
-        q_start_month = ((today.month - 1) // 3) * 3 + 1
-        timeline_start = today.replace(month=q_start_month, day=1)
-    else:
-        timeline_start = today.replace(day=1)
 
-    # Timeline end comes from the latest item end_date, and from the end of any
-    # objective set synced onto this roadmap (so synced key results are covered).
+    def _quarter_start(d):
+        return d.replace(month=((d.month - 1) // 3) * 3 + 1, day=1)
+
+    def _quarter_end(d):
+        m = ((d.month - 1) // 3) * 3 + 3
+        return d.replace(month=m, day=calendar.monthrange(d.year, m)[1])
+
+    def _shift_years(d, years):
+        try:
+            return d.replace(year=d.year + years)
+        except ValueError:  # 29 Feb in a non-leap target year
+            return d.replace(year=d.year + years, day=28)
+
+    def _parse_iso(s):
+        try:
+            return date.fromisoformat(s)
+        except (TypeError, ValueError):
+            return None
+
+    range_min = _shift_years(today, -1)
+    range_max = _shift_years(today, 10)
+
     from . import access
     dated_items = [i for i in items if i.start_date and i.end_date]
     end_candidates = [i.end_date for i in dated_items]
     end_candidates += [s.end_date for s in access.applied_objective_sets(roadmap) if s.end_date]
-    if end_candidates:
-        max_date = max(end_candidates)
-        last_day = calendar.monthrange(max_date.year, max_date.month)[1]
-        timeline_end = max_date.replace(day=last_day)
-    else:
-        timeline_end = (timeline_start + timedelta(days=365)).replace(day=1) - timedelta(days=1)
+
+    default_start = _quarter_start(today)
+    default_end = _quarter_end(max(end_candidates)) if end_candidates \
+        else _quarter_end(_shift_years(default_start, 1) - timedelta(days=1))
+    if default_end < default_start:
+        default_end = _quarter_end(default_start)
+
+    custom_start = _parse_iso(request.GET.get('start'))
+    custom_end = _parse_iso(request.GET.get('end'))
+    timeline_start = custom_start or default_start
+    timeline_end = custom_end or default_end
+
+    # Clamp to the selectable window and snap to whole months (gantt columns).
+    timeline_start = min(max(timeline_start, range_min), range_max).replace(day=1)
+    timeline_end = min(max(timeline_end, range_min), range_max)
+    timeline_end = timeline_end.replace(day=calendar.monthrange(timeline_end.year, timeline_end.month)[1])
+    if timeline_end < timeline_start:
+        timeline_end = _quarter_end(timeline_start)
+
+    # Query-string fragment so toolbar links keep a custom window.
+    date_qs = ''
+    if custom_start:
+        date_qs += f'&start={custom_start.isoformat()}'
+    if custom_end:
+        date_qs += f'&end={custom_end.isoformat()}'
 
     if time_scale == 'quarters':
         columns = _build_quarters(timeline_start, timeline_end)
@@ -174,6 +224,19 @@ def roadmap_detail(request, pk):
         'roadmap_category_tags': category_pool.filter(items__roadmap=roadmap).distinct().order_by('name'),
         'selected_category_ids': selected_category_ids,
         'selected_categories_str': selected_categories_str,
+        # Item-type (sub-lane) visibility filter
+        'visible_tracks': visible_tracks,
+        'selected_tracks_str': selected_tracks_str,
+        'track_filter_labels': [('activity', 'Activity'), ('milestone', 'Milestone'), ('metric', 'Metric')],
+        'first_visible_track': first_visible_track,
+        'last_visible_track': last_visible_track,
+        'custom_range': bool(custom_start or custom_end),
+        # Date-window filter (values + selectable range for the toolbar inputs)
+        'range_start_iso': timeline_start.isoformat(),
+        'range_end_iso': timeline_end.isoformat(),
+        'range_min_iso': range_min.isoformat(),
+        'range_max_iso': range_max.isoformat(),
+        'date_qs': date_qs,
         # JSON seeds for the modals
         'manage_json': json.dumps({
             'objective_type': objective_type,

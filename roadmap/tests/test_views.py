@@ -155,3 +155,40 @@ class ListViewTests(TestCase):
     def test_root_redirects_to_teams(self):
         res = self.client.get('/')
         self.assertRedirects(res, '/teams/', fetch_redirect_response=False)
+
+
+class DetailFilterTests(TestCase):
+    """Date-window + item-type (track) filters on the roadmap detail view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='Filters RM', roadmap_type=Roadmap.SERVICE)
+        Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='A1',
+                            start_date=date(2026, 8, 1), end_date=date(2026, 9, 30))
+
+    def test_track_filter_limits_visible_tracks(self):
+        res = self.client.get(f'/{self.rm.pk}/?tracks=activity')
+        self.assertEqual(res.context['visible_tracks'], {'activity'})
+        self.assertEqual(res.context['selected_tracks_str'], 'activity')
+        self.assertEqual(res.context['first_visible_track'], 'activity')
+
+    def test_all_tracks_selected_is_no_filter(self):
+        res = self.client.get(f'/{self.rm.pk}/?tracks=activity,milestone,metric')
+        self.assertEqual(res.context['visible_tracks'], {'activity', 'milestone', 'metric'})
+        self.assertEqual(res.context['selected_tracks_str'], '')  # all == no filter
+
+    def test_no_track_param_shows_all(self):
+        res = self.client.get(f'/{self.rm.pk}/')
+        self.assertEqual(res.context['visible_tracks'], {'activity', 'milestone', 'metric'})
+
+    def test_custom_date_window_applied(self):
+        res = self.client.get(f'/{self.rm.pk}/?start=2027-01-01&end=2027-06-30')
+        self.assertEqual(res.context['range_start_iso'], '2027-01-01')
+        self.assertEqual(res.context['range_end_iso'], '2027-06-30')
+        self.assertTrue(res.context['custom_range'])
+
+    def test_date_window_clamped_to_range(self):
+        # 1990 is far before range_min (today-1yr); it clamps up to range_min's
+        # month (start snaps to day 1, so compare at month granularity).
+        res = self.client.get(f'/{self.rm.pk}/?start=1990-01-01')
+        self.assertEqual(res.context['range_start_iso'][:7], res.context['range_min_iso'][:7])
