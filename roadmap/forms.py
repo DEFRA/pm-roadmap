@@ -14,12 +14,10 @@ from . import okr_periods
 class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
-        fields = ['organisation', 'name', 'mission', 'vision']
+        fields = ['organisation', 'name']
         widgets = {
             'organisation': forms.Select(attrs={'class': 'form-input'}),
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Licensing'}),
-            'mission': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
-            'vision': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
 
 
