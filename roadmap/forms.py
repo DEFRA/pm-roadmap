@@ -20,6 +20,26 @@ class TeamForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Licensing'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # An org might not exist yet — let the user proceed without picking one.
+        # A team with no org chosen is linked to a background "No org" placeholder
+        # (see save). Eventually org creation will be required up front.
+        self.fields['organisation'].required = False
+        self.fields['organisation'].empty_label = "My organisation isn't listed yet"
+
+    def save(self, commit=True):
+        team = super().save(commit=False)
+        if team.organisation_id is None:
+            team.organisation = Organisation.objects.get_or_create(
+                name='No org',
+                defaults={'description': "Placeholder for teams whose organisation "
+                                         "has not been created yet."},
+            )[0]
+        if commit:
+            team.save()
+        return team
+
 
 class ObjectiveSetForm(forms.ModelForm):
     """Create/edit an OKR set. Organisation, scope and team are real form fields

@@ -19,6 +19,15 @@ class TeamPageTests(TestCase):
         self.assertEqual(team.organisation, self.org)
         self.assertEqual(res.url, reverse('roadmap:team_home', args=[team.pk]))
 
+    def test_create_team_without_org_uses_no_org_placeholder(self):
+        res = self.client.post(reverse('roadmap:team_create'), {'organisation': '', 'name': 'Nomads'})
+        self.assertEqual(res.status_code, 302)
+        team = Team.objects.get(name='Nomads')
+        self.assertEqual(team.organisation.name, 'No org')
+        # A second org-less team reuses the same placeholder, not a duplicate.
+        self.client.post(reverse('roadmap:team_create'), {'organisation': '', 'name': 'Drifters'})
+        self.assertEqual(Organisation.objects.filter(name='No org').count(), 1)
+
     def test_team_home_renders(self):
         team = Team.objects.create(organisation=self.org, name='Licensing')
         res = self.client.get(reverse('roadmap:team_home', args=[team.pk]))
