@@ -5,15 +5,25 @@ pages list teams and show a team's OKRs + roadmaps. Ported from myproduct.pro's
 team_home, trimmed to the OKR scope: no user members, no experiments/PRDs (out
 of scope), and no authentication.
 """
+import json
+
 from django.shortcuts import render, redirect, get_object_or_404
 
-from .models import Team, ObjectiveSet, Roadmap
+from .models import Team, ObjectiveSet, Roadmap, Organisation
 from .forms import TeamForm
 
 
 def team_list(request):
     teams = Team.objects.select_related('organisation').all()
-    return render(request, 'roadmap/team_list.html', {'teams': teams})
+    teams_json = json.dumps([
+        {'id': t.pk, 'name': t.name, 'org_id': t.organisation_id, 'org_name': t.organisation.name}
+        for t in teams
+    ])
+    return render(request, 'roadmap/team_list.html', {
+        'teams': teams,
+        'teams_json': teams_json,
+        'organisations': Organisation.objects.all(),
+    })
 
 
 def team_home(request, pk):
