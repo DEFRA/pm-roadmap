@@ -32,21 +32,8 @@ def objective_list(request):
 
 
 # ── Objective sets ────────────────────────────────────────────────────────────
-
-def _set_form(request, instance):
-    form = ObjectiveSetForm(request.POST or None, instance=instance)
-    if request.method == 'POST' and form.is_valid():
-        obj_set = form.save()
-        return redirect('roadmap:objective_set_detail', pk=obj_set.pk)
-    return render(request, 'roadmap/objective_set_form.html', {
-        'form': form,
-        'objective_set': instance if instance.pk else None,
-    })
-
-
-def objective_set_create(request):
-    return _set_form(request, ObjectiveSet())
-
+# New sets are always created from a team page (views_team.team_set_create) so
+# they are tied to a team. Only editing lives here.
 
 def objective_set_detail(request, pk):
     obj_set = get_object_or_404(
@@ -70,7 +57,15 @@ def _set_home_redirect(obj_set):
 
 def objective_set_edit(request, pk):
     obj_set = get_object_or_404(ObjectiveSet, pk=pk)
-    return _set_form(request, obj_set)
+    form = ObjectiveSetForm(request.POST or None, instance=obj_set)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        return redirect('roadmap:objective_set_detail', pk=obj_set.pk)
+    return render(request, 'roadmap/objective_set_form.html', {
+        'form': form,
+        'objective_set': obj_set,
+        'team': obj_set.team,
+    })
 
 
 @require_POST

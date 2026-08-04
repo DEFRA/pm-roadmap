@@ -22,7 +22,7 @@
 
   <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
     <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0;">Objectives and Key Results</h2>
-    <a href="{% url 'roadmap:objective_set_create' %}" class="btn btn-ghost" style="font-size:12px;">+ New set</a>
+    <a href="{% url 'roadmap:team_set_create' team.pk %}" class="btn btn-ghost" style="font-size:12px;">+ New set</a>
   </div>
   {% for set in team_sets %}
     <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem; display:flex; align-items:center; justify-content:space-between;">

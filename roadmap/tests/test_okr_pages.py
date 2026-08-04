@@ -51,34 +51,28 @@ class ObjectiveSetPageTests(TestCase):
         self.org = Organisation.objects.create(name='MMO')
         self.team = Team.objects.create(organisation=self.org, name='Licensing')
 
-    def test_create_group_set_with_preset_fills_dates(self):
-        res = self.client.post(reverse('roadmap:objective_set_create'), {
-            'organisation': self.org.pk, 'scope': ObjectiveSet.GROUP, 'team': '',
+    def test_team_set_create_with_preset_fills_dates(self):
+        res = self.client.post(reverse('roadmap:team_set_create', args=[self.team.pk]), {
             'name': '', 'period_preset': 'current_quarter', 'start_date': '', 'end_date': '',
         })
         self.assertEqual(res.status_code, 302)
         s = ObjectiveSet.objects.get()
-        self.assertEqual(s.scope, ObjectiveSet.GROUP)
-        self.assertIsNone(s.team_id)
+        # Scope/team/org are taken from the team, not the form.
+        self.assertEqual(s.scope, ObjectiveSet.TEAM)
+        self.assertEqual(s.team, self.team)
+        self.assertEqual(s.organisation, self.org)
         self.assertEqual(s.period, ObjectiveSet.QUARTERLY)
         self.assertTrue(s.start_date and s.end_date)  # preset auto-filled
         self.assertTrue(s.name)  # suggested name filled
+        self.assertRedirects(res, reverse('roadmap:objective_set_detail', args=[s.pk]),
+                             fetch_redirect_response=False)
 
-    def test_team_scope_requires_team(self):
-        res = self.client.post(reverse('roadmap:objective_set_create'), {
-            'organisation': self.org.pk, 'scope': ObjectiveSet.TEAM, 'team': '',
+    def test_team_set_create_custom_name(self):
+        res = self.client.post(reverse('roadmap:team_set_create', args=[self.team.pk]), {
             'name': 'FY26 Q1', 'period_preset': 'custom', 'start_date': '', 'end_date': '',
         })
-        self.assertEqual(res.status_code, 200)  # re-renders with error
-        self.assertEqual(ObjectiveSet.objects.count(), 0)
-
-    def test_create_team_set(self):
-        res = self.client.post(reverse('roadmap:objective_set_create'), {
-            'organisation': self.org.pk, 'scope': ObjectiveSet.TEAM, 'team': self.team.pk,
-            'name': 'FY26 Q1', 'period_preset': 'current_quarter', 'start_date': '', 'end_date': '',
-        })
         self.assertEqual(res.status_code, 302)
-        self.assertEqual(ObjectiveSet.objects.get().team, self.team)
+        self.assertEqual(ObjectiveSet.objects.get().name, 'FY26 Q1')
 
     def test_archive_unarchive_and_delete(self):
         s = ObjectiveSet.objects.create(organisation=self.org, scope=ObjectiveSet.GROUP, name='X')

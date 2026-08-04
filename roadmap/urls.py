@@ -16,7 +16,6 @@ urlpatterns = [
     path('objectives/new/', views_okr.objective_create, name='objective_create'),
     path('objectives/<int:pk>/edit/', views_okr.objective_edit, name='objective_edit'),
     path('objectives/<int:pk>/delete/', views_okr.objective_delete, name='objective_delete'),
-    path('objectives/sets/new/', views_okr.objective_set_create, name='objective_set_create'),
     path('objectives/sets/<int:pk>/', views_okr.objective_set_detail, name='objective_set_detail'),
     path('objectives/sets/<int:pk>/edit/', views_okr.objective_set_edit, name='objective_set_edit'),
     path('objectives/sets/<int:pk>/delete/', views_okr.objective_set_delete, name='objective_set_delete'),
@@ -28,6 +27,7 @@ urlpatterns = [
     path('teams/new/', views_team.team_create, name='team_create'),
     path('teams/<int:pk>/', views_team.team_home, name='team_home'),
     path('teams/<int:pk>/edit/', views_team.team_edit, name='team_edit'),
+    path('teams/<int:pk>/sets/new/', views_team.team_set_create, name='team_set_create'),
     path('teams/<int:pk>/roadmaps/new/', views_team.team_roadmap_create, name='team_roadmap_create'),
 
     path('<int:pk>/', views.roadmap_detail, name='detail'),

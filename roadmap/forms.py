@@ -53,17 +53,15 @@ class TeamForm(forms.ModelForm):
 
 
 class ObjectiveSetForm(forms.ModelForm):
-    """Create/edit an OKR set. Organisation, scope and team are real form fields
-    here (mpp resolved them from the signed-in user's memberships)."""
+    """Create/edit an OKR set's name + timeframe. Organisation, scope and team are
+    not asked for here — a set is always created from (and owned by) a team, so the
+    view sets them from the team in the URL."""
     period_preset = forms.ChoiceField(label='Timeframe', widget=forms.RadioSelect)
 
     class Meta:
         model = ObjectiveSet
-        fields = ['organisation', 'scope', 'team', 'name', 'start_date', 'end_date']
+        fields = ['name', 'start_date', 'end_date']
         widgets = {
-            'organisation': forms.Select(attrs={'class': 'form-input'}),
-            'scope': forms.Select(attrs={'class': 'form-input'}),
-            'team': forms.Select(attrs={'class': 'form-input'}),
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. FY26 Q1'}),
             'start_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
             'end_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}),
@@ -75,8 +73,6 @@ class ObjectiveSetForm(forms.ModelForm):
         self.fields['name'].required = False
         self.fields['start_date'].required = False
         self.fields['end_date'].required = False
-        self.fields['team'].required = False
-        self.fields['team'].empty_label = 'No team (organisation set)'
 
         labelled = []
         for key, label in okr_periods.PRESET_CHOICES:
@@ -114,24 +110,11 @@ class ObjectiveSetForm(forms.ModelForm):
             self.add_error('name', 'This field is required.')
         else:
             cleaned['name'] = name
-
-        # Enforce the scope/team consistency the DB CheckConstraint requires, with
-        # a friendly message instead of an IntegrityError.
-        scope = cleaned.get('scope')
-        team = cleaned.get('team')
-        if scope == ObjectiveSet.TEAM and not team:
-            self.add_error('team', 'Pick a team for a team-scoped set.')
-        if scope == ObjectiveSet.GROUP and team:
-            cleaned['team'] = None
-        if team and cleaned.get('organisation') and team.organisation_id != cleaned['organisation'].pk:
-            self.add_error('team', 'That team belongs to a different organisation.')
         return cleaned
 
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.period = self.cleaned_data.get('period')
-        if self.cleaned_data.get('scope') == ObjectiveSet.GROUP:
-            instance.team = None
         if commit:
             instance.save()
         return instance

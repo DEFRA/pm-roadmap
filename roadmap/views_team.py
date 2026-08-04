@@ -10,7 +10,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 
 from .models import Team, ObjectiveSet, Roadmap, Organisation
-from .forms import TeamForm, TeamRoadmapForm
+from .forms import TeamForm, TeamRoadmapForm, ObjectiveSetForm
 
 
 def team_list(request):
@@ -51,6 +51,22 @@ def _team_form(request, instance):
         'form': form,
         'team': instance if instance.pk else None,
     })
+
+
+def team_set_create(request, pk):
+    """Create an objective set owned by this team (scope=team). Organisation and
+    team come from the team, so the form only asks for name + timeframe."""
+    team = get_object_or_404(Team.objects.select_related('organisation'), pk=pk)
+    instance = ObjectiveSet(organisation=team.organisation, scope=ObjectiveSet.TEAM, team=team)
+    form = ObjectiveSetForm(request.POST or None, instance=instance)
+    if request.method == 'POST' and form.is_valid():
+        obj_set = form.save(commit=False)
+        obj_set.organisation = team.organisation
+        obj_set.scope = ObjectiveSet.TEAM
+        obj_set.team = team
+        obj_set.save()
+        return redirect('roadmap:objective_set_detail', pk=obj_set.pk)
+    return render(request, 'roadmap/objective_set_form.html', {'form': form, 'team': team})
 
 
 def team_roadmap_create(request, pk):
