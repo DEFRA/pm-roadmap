@@ -9,7 +9,8 @@
 
   <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem;">
     <h1 style="margin:0;">{{ team.name }}</h1>
-    <a href="{% url 'roadmap:team_edit' team.pk %}" class="btn btn-ghost" style="font-size:12px;">Edit team</a>
+    <a href="{% url 'roadmap:team_edit' team.pk %}" class="roadmap-header__add"
+       title="Edit team" aria-label="Edit team">&#9998;</a>
   </div>
 
   {% if team.mission %}
