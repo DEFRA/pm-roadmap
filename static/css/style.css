@@ -687,3 +687,60 @@ textarea.form-input { resize: vertical; line-height: 1.5; }
   margin-bottom: 1rem;
 }
 .alert-info { background: rgba(40,161,151,0.08); border: 1px solid rgba(40,161,151,0.3); color: var(--text-main); }
+
+/* ── OKR set timeframe preset cards (objective_set_form) ───────────────────── */
+.okr-preset-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.okr-preset-btn {
+  position: relative;
+  display: flex;
+  cursor: pointer;
+}
+/* "Choose my own dates" sits on its own full-width row. */
+.okr-preset-btn--wide { grid-column: 1 / -1; }
+/* The radio stays in the DOM (form submission, keyboard nav) but is not drawn. */
+.okr-preset-btn input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.okr-preset-btn span {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-main);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.okr-preset-btn span em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+.okr-preset-btn:hover span { border-color: var(--accent-gold); }
+.okr-preset-btn input:checked + span {
+  border-color: var(--accent-gold);
+  background: var(--accent-gold);
+  color: #fff;
+}
+.okr-preset-btn input:checked + span em { color: rgba(255, 255, 255, 0.8); }
+.okr-preset-btn input:focus-visible + span {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+@media (max-width: 520px) {
+  .okr-preset-list { grid-template-columns: minmax(0, 1fr); }
+}

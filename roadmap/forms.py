@@ -120,6 +120,34 @@ class ObjectiveSetForm(forms.ModelForm):
         return instance
 
 
+def set_form_seed(form):
+    """Data for the timeframe preset cards + conditional date inputs on
+    objective_set_form.html. Serialised to the page via json_script."""
+    presets = []
+    for key, label in okr_periods.PRESET_CHOICES:
+        if key == okr_periods.WINDOW_CUSTOM:
+            presets.append({'key': key, 'title': label, 'range': '', 'wide': True,
+                            'start': '', 'end': '', 'suggestedName': ''})
+        else:
+            _p, start, end, suggested = okr_periods.resolve_preset(key)
+            presets.append({'key': key, 'title': label, 'range': f'{start:%b} – {end:%b %Y}',
+                            'wide': False, 'start': start.isoformat(), 'end': end.isoformat(),
+                            'suggestedName': suggested})
+
+    def iso(value):
+        if not value:
+            return ''
+        return value.isoformat() if hasattr(value, 'isoformat') else str(value)
+
+    return {
+        'presets': presets,
+        'preset': form['period_preset'].value() or okr_periods.WINDOW_CUSTOM,
+        'name': form['name'].value() or '',
+        'startDate': iso(form['start_date'].value()),
+        'endDate': iso(form['end_date'].value()),
+    }
+
+
 class ObjectiveForm(forms.ModelForm):
     class Meta:
         model = Objective

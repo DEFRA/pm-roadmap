@@ -10,7 +10,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 
 from .models import Team, ObjectiveSet, Roadmap, Organisation
-from .forms import TeamForm, TeamRoadmapForm, ObjectiveSetForm
+from .forms import TeamForm, TeamRoadmapForm, ObjectiveSetForm, set_form_seed
 
 
 def team_list(request):
@@ -66,7 +66,9 @@ def team_set_create(request, pk):
         obj_set.team = team
         obj_set.save()
         return redirect('roadmap:objective_set_detail', pk=obj_set.pk)
-    return render(request, 'roadmap/objective_set_form.html', {'form': form, 'team': team})
+    return render(request, 'roadmap/objective_set_form.html', {
+        'form': form, 'team': team, 'form_seed': set_form_seed(form),
+    })
 
 
 def team_roadmap_create(request, pk):

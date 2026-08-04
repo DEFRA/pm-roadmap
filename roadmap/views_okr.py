@@ -12,7 +12,7 @@ from django.views.decorators.http import require_POST
 
 from . import okr_periods
 from .models import Objective, ObjectiveSet
-from .forms import ObjectiveForm, ObjectiveSetForm, KeyResultFormSet
+from .forms import ObjectiveForm, ObjectiveSetForm, KeyResultFormSet, set_form_seed
 
 
 def objective_list(request):
@@ -65,6 +65,7 @@ def objective_set_edit(request, pk):
         'form': form,
         'objective_set': obj_set,
         'team': obj_set.team,
+        'form_seed': set_form_seed(form),
     })
 
 

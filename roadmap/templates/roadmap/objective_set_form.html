@@ -1,8 +1,14 @@
 {% extends "roadmap/base.html" %}
 {% block title %}{% if objective_set %}Edit set{% else %}New set{% endif %}{% endblock %}
 
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak]{display:none!important}</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width:560px; margin:0 auto;">
+{{ form_seed|json_script:"okr-set-seed" }}
+<div style="max-width:520px; margin:0 auto;" x-data="okrSetForm()">
   {% if team %}
     <div style="font-size:12px; color:var(--text-muted); margin-bottom:0.5rem;">
       <a href="{% url 'roadmap:team_home' team.pk %}" style="color:inherit;">{{ team.name }}</a> &rsaquo;
@@ -17,34 +23,65 @@
     {% csrf_token %}
     {% if form.non_field_errors %}<div style="color:var(--priority-critical); margin-bottom:1rem;">{{ form.non_field_errors }}</div>{% endif %}
 
-    {% for field in form %}
-      {% if field.name != 'period_preset' %}
-      <div style="margin-bottom:1rem;">
-        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<div style="font-size:12px; color:var(--text-muted); margin-top:2px;">{{ field.help_text }}</div>{% endif %}
-        {% if field.errors %}<div style="font-size:12px; color:var(--priority-critical); margin-top:2px;">{{ field.errors }}</div>{% endif %}
-      </div>
-      {% endif %}
-    {% endfor %}
-
-    <div style="margin-bottom:1rem;">
-      <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">{{ form.period_preset.label }}</label>
-      <div style="display:flex; flex-direction:column; gap:4px;">
-        {% for radio in form.period_preset %}
-          <label style="font-size:13px;">{{ radio.tag }} {{ radio.choice_label }}</label>
-        {% endfor %}
-      </div>
-      <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-        Pick a preset to auto-fill the dates, or choose your own dates above.
-      </div>
-      {% if form.period_preset.errors %}<div style="font-size:12px; color:var(--priority-critical);">{{ form.period_preset.errors }}</div>{% endif %}
+    <div class="modal-card__section" style="margin-bottom:1.25rem;">
+      <label class="modal-card__section-label">Name</label>
+      <input type="text" name="name" class="form-input" x-model="name"
+             value="{{ form_seed.name }}" placeholder="e.g. FY26 Q1" maxlength="120" />
+      {% if form.name.errors %}<div style="color:var(--priority-critical); font-size:12px;">{{ form.name.errors|striptags }}</div>{% endif %}
     </div>
 
-    <div style="display:flex; gap:8px; margin-top:1.5rem;">
+    <div class="modal-card__section">
+      <label class="modal-card__section-label">Timeframe</label>
+      <div class="okr-preset-list">
+        {% for opt in form_seed.presets %}
+          <label class="okr-preset-btn{% if opt.wide %} okr-preset-btn--wide{% endif %}">
+            <input type="radio" name="period_preset" value="{{ opt.key }}"
+                   x-model="preset" @change="applyPreset()"
+                   {% if opt.key == form_seed.preset %}checked{% endif %} />
+            <span>{{ opt.title }}{% if opt.range %}<em>{{ opt.range }}</em>{% endif %}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% if form.period_preset.errors %}<div style="color:var(--priority-critical); font-size:12px;">{{ form.period_preset.errors|striptags }}</div>{% endif %}
+    </div>
+
+    <div style="display:flex; gap:0.75rem; margin-top:1rem;" x-show="preset === 'custom'" x-cloak>
+      <div class="modal-card__section" style="flex:1;">
+        <label class="modal-card__section-label">Start date</label>
+        <input type="date" name="start_date" class="form-input" x-model="startDate" value="{{ form_seed.startDate }}" />
+      </div>
+      <div class="modal-card__section" style="flex:1;">
+        <label class="modal-card__section-label">End date</label>
+        <input type="date" name="end_date" class="form-input" x-model="endDate" value="{{ form_seed.endDate }}" />
+        {% if form.end_date.errors %}<div style="color:var(--priority-critical); font-size:12px;">{{ form.end_date.errors|striptags }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:0.5rem; margin-top:1.5rem;">
       <button type="submit" class="btn btn-primary">Save</button>
-      <a href="{% url 'roadmap:objective_list' %}" class="btn btn-ghost">Cancel</a>
+      <a href="{% if team %}{% url 'roadmap:team_home' team.pk %}{% else %}{% url 'roadmap:objective_list' %}{% endif %}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
 </div>
+
+<script>
+function okrSetForm() {
+  const seed = JSON.parse(document.getElementById('okr-set-seed').textContent);
+  const byKey = Object.fromEntries(seed.presets.map((p) => [p.key, p]));
+  const active = byKey[seed.preset];
+  return {
+    preset: seed.preset || 'custom',
+    name: seed.name || '',
+    startDate: seed.startDate || (active && active.start) || '',
+    endDate: seed.endDate || (active && active.end) || '',
+    applyPreset() {
+      const opt = byKey[this.preset];
+      if (!opt || this.preset === 'custom') return;
+      this.startDate = opt.start;
+      this.endDate = opt.end;
+      if (!this.name.trim() && opt.suggestedName) this.name = opt.suggestedName;
+    },
+  };
+}
+</script>
 {% endblock %}
