@@ -66,10 +66,14 @@ def roadmap_detail(request, pk):
     else:
         timeline_start = today.replace(day=1)
 
-    # Timeline end comes from the latest item end_date
+    # Timeline end comes from the latest item end_date, and from the end of any
+    # objective set synced onto this roadmap (so synced key results are covered).
+    from . import access
     dated_items = [i for i in items if i.start_date and i.end_date]
-    if dated_items:
-        max_date = max(i.end_date for i in dated_items)
+    end_candidates = [i.end_date for i in dated_items]
+    end_candidates += [s.end_date for s in access.applied_objective_sets(roadmap) if s.end_date]
+    if end_candidates:
+        max_date = max(end_candidates)
         last_day = calendar.monthrange(max_date.year, max_date.month)[1]
         timeline_end = max_date.replace(day=last_day)
     else:
@@ -487,29 +491,106 @@ def _build_swimlanes(items, tag_type, columns, total_v):
     return lanes
 
 
-def _build_objective_swimlanes(roadmap, items, columns, total_v):
-    """Swim lanes grouped by Objective entity (see roadmap/access.py for which
-    objectives are on a roadmap). Items sit in the lane of their item.objective;
-    anything unassigned falls into an 'Unassigned' lane."""
-    from . import access
-    from .models import Objective
+class _KrSpan:
+    """Adapter that lends a key result the timeframe of its objective's set, so a
+    KeyResult (which has no dates of its own) can be placed on the timeline via
+    _item_to_bar — the key result bar spans the whole set period."""
+    def __init__(self, obj_set):
+        self.start_date = obj_set.start_date
+        self.end_date = obj_set.end_date
 
-    obj_ids = access.roadmap_objective_ids(roadmap)
-    objectives = list(Objective.objects.filter(pk__in=obj_ids).order_by('sort_order', 'title'))
-    obj_items = {o.pk: [] for o in objectives}
-    untagged = []
-    for item in items:
-        if item.objective_id in obj_items:
-            obj_items[item.objective_id].append(item)
+
+def _kr_bar(kr, obj_set, columns, total_v):
+    bar = _item_to_bar(_KrSpan(obj_set), columns, total_v)
+    if bar is None:
+        return None  # set has no timeframe — the key result can't be placed
+    return {'kr_title': kr.title, 'kr_id': kr.pk, 'kr_progress': kr.progress,
+            'left_pct': bar['left_pct'], 'width_pct': bar['width_pct']}
+
+
+def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
+    """A lane for one roadmap objective. Its key results span the set timeframe
+    (KeyResult model bars); metric items assigned to it also plot on the metrics
+    track. Activities/milestones plot on their own tracks as usual."""
+    tracks = {'activities': [], 'milestones': [], 'metrics': []}
+
+    kr_titles = set()
+    if objective is not None and obj_set is not None and obj_set.start_date and obj_set.end_date:
+        for kr in objective.key_results.all():
+            kr_titles.add(kr.title)
+            bar = _kr_bar(kr, obj_set, columns, total_v)
+            if bar is not None:
+                tracks['metrics'].append(bar)
+
+    for item in obj_items:
+        bar = _item_to_bar(item, columns, total_v)
+        if bar is None:
+            continue
+        if item.item_type == Item.ACTIVITY:
+            tracks['activities'].append(bar)
+        elif item.item_type == Item.MILESTONE:
+            tracks['milestones'].append(bar)
+        elif item.item_type == Item.METRIC:
+            # In a set lane a metric item that backs a key result is already
+            # drawn as the KeyResult bar — don't double it.
+            if item.title in kr_titles:
+                continue
+            tracks['metrics'].append(bar)
+
+    timeline_px = total_v * _BASE_PX_PER_UNIT
+    stacked_tracks = {}
+    for track_name, bars in tracks.items():
+        if track_name == 'milestones':
+            stacked, row_count = _stack_milestones(bars, timeline_px)
         else:
-            untagged.append(item)
+            stacked, row_count = _stack_bars(bars)
+        stacked_tracks[track_name] = {'bars': stacked, 'row_count': max(row_count, 1)}
 
-    lanes = [
-        _make_lane(o.title, obj_items[o.pk], columns, total_v, tag_id=None)
-        for o in objectives
-    ]
-    if untagged:
-        lanes.append(_make_lane('Unassigned', untagged, columns, total_v, tag_id=None))
+    return {'name': name, 'tag_id': None,
+            'objective_id': objective.pk if objective else None, 'tracks': stacked_tracks}
+
+
+def _build_objective_swimlanes(roadmap, items, columns, total_v):
+    """Swim lanes grouped by Objective entity. Objectives come from the roadmap's
+    synced objective sets (access.applied_objective_sets) and any objectives
+    linked directly; each objective's key results plot across its set's period,
+    and items sit in the lane of their item.objective. Unassigned items fall into
+    an 'Unassigned' lane."""
+    from . import access
+
+    applied_sets = list(access.applied_objective_sets(roadmap))
+    direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
+    set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
+    standalone = [o for o in direct_objectives if o.pk not in set_objective_ids]
+
+    lane_specs = []  # (objective or None, owning set or None)
+    for obj_set in applied_sets:
+        objectives = list(obj_set.objectives.all())
+        if not objectives:
+            lane_specs.append((None, obj_set))  # empty-set placeholder
+        for objective in objectives:
+            lane_specs.append((objective, obj_set))
+    for objective in standalone:
+        lane_specs.append((objective, None))
+    lane_specs.sort(key=lambda pair: (
+        pair[0] is None,
+        pair[0].sort_order if pair[0] is not None else 0,
+        pair[0].title if pair[0] is not None else '',
+    ))
+
+    lanes = []
+    shown_ids = set()
+    for objective, obj_set in lane_specs:
+        if objective is None:
+            lanes.append(_make_objective_lane('No objectives yet', None, [], obj_set, columns, total_v))
+            continue
+        shown_ids.add(objective.pk)
+        obj_items = [i for i in items if i.objective_id == objective.pk]
+        lanes.append(_make_objective_lane(objective.title, objective, obj_items, obj_set, columns, total_v))
+
+    unassigned = [i for i in items if i.objective_id is None or i.objective_id not in shown_ids]
+    if unassigned:
+        lanes.append(_make_objective_lane('Unassigned', None, unassigned, None, columns, total_v))
     return lanes
 
 
@@ -519,8 +600,8 @@ def _serialise_items(lanes):
     for lane in lanes:
         for track in lane['tracks'].values():
             for bar in track['bars']:
-                item = bar['item']
-                if item.pk in seen:
+                item = bar.get('item')
+                if item is None or item.pk in seen:  # key-result bars have no item
                     continue
                 seen.add(item.pk)
                 data[item.pk] = {

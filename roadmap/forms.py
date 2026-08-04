@@ -15,7 +15,10 @@ class TeamRoadmapForm(forms.ModelForm):
     """Minimal form to create a roadmap owned by a team (from the team page)."""
     class Meta:
         model = Roadmap
-        fields = ['name', 'roadmap_type']
+        fields = ['name', 'roadmap_type', 'sync_okrs']
+        labels = {
+            'sync_okrs': "Sync this team's objectives and key results onto the roadmap",
+        }
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Licensing Service Roadmap'}),
             'roadmap_type': forms.Select(attrs={'class': 'form-input'}),

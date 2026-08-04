@@ -34,16 +34,25 @@ class TeamPageTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Licensing')
 
-    def test_team_creates_roadmap_it_owns(self):
+    def test_team_creates_roadmap_it_owns_with_okr_sync(self):
         from roadmap.models import Roadmap
         team = Team.objects.create(organisation=self.org, name='Licensing')
         res = self.client.post(reverse('roadmap:team_roadmap_create', args=[team.pk]), {
-            'name': 'Licensing Service Roadmap', 'roadmap_type': Roadmap.SERVICE,
+            'name': 'Licensing Service Roadmap', 'roadmap_type': Roadmap.SERVICE, 'sync_okrs': 'on',
         })
         rm = Roadmap.objects.get(name='Licensing Service Roadmap')
         self.assertEqual(rm.owning_team, team)
         self.assertIn(self.org, rm.organisations.all())
+        self.assertTrue(rm.sync_okrs)
         self.assertRedirects(res, reverse('roadmap:detail', args=[rm.pk]), fetch_redirect_response=False)
+
+    def test_team_roadmap_sync_can_be_turned_off(self):
+        from roadmap.models import Roadmap
+        team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.client.post(reverse('roadmap:team_roadmap_create', args=[team.pk]), {
+            'name': 'No sync RM', 'roadmap_type': Roadmap.SERVICE,  # checkbox absent = off
+        })
+        self.assertFalse(Roadmap.objects.get(name='No sync RM').sync_okrs)
 
 
 class ObjectiveSetPageTests(TestCase):

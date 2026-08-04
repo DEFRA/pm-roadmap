@@ -95,3 +95,36 @@ class ObjectiveSwimlaneRenderTests(TestCase):
         # The objective entity's title heads a swim lane, and its metric renders.
         self.assertContains(res, 'Grow adoption')
         self.assertContains(res, 'Signups')
+
+
+class SyncedKeyResultPlottingTests(TestCase):
+    """A synced objective set's key results are plotted across the set's period."""
+
+    def setUp(self):
+        from roadmap.models import ObjectiveSet, KeyResult
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.set = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date='2026-07-01', end_date='2026-09-30',
+        )
+        self.obj = Objective.objects.create(objective_set=self.set, team=self.team, title='Speed up licensing')
+        self.kr = KeyResult.objects.create(objective=self.obj, title='Median wait (days)',
+                                           start_value=45, target_value=20, current_value=30)
+        # Team roadmap with OKR sync on — no items of its own.
+        self.rm = Roadmap.objects.create(name='Licensing RM', roadmap_type=Roadmap.SERVICE,
+                                         owning_team=self.team, sync_okrs=True)
+        self.rm.organisations.add(self.org)
+
+    def test_synced_kr_is_plotted(self):
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Speed up licensing')       # objective lane
+        self.assertContains(res, 'Median wait (days)')       # key result bar
+        self.assertContains(res, 'gantt-bar--kr')            # rendered as a KR bar
+
+    def test_sync_off_hides_the_kr(self):
+        self.rm.sync_okrs = False
+        self.rm.save(update_fields=['sync_okrs'])
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        self.assertNotContains(res, 'Median wait (days)')

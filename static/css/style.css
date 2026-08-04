@@ -744,3 +744,11 @@ textarea.form-input { resize: vertical; line-height: 1.5; }
 @media (max-width: 520px) {
   .okr-preset-list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Key result bars synced from an objective set: same metric colour, but a
+   subtle diagonal stripe + no pointer, to read as a read-only reference. */
+.gantt-bar--kr {
+  cursor: default;
+  background-image: repeating-linear-gradient(
+    45deg, rgba(255, 255, 255, 0.22) 0 5px, transparent 5px 11px);
+}

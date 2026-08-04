@@ -190,8 +190,14 @@
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
+            {% if bar.item %}
             <div class="gantt-bar gantt-bar--metric" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
+            {% else %}
+            {# Key result synced from an objective set — spans the set period, read-only here #}
+            <div class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+                 title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target"><span class="gantt-bar__label">{{ bar.kr_title }}</span></div>
+            {% endif %}
           {% endfor %}
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
         </div>
