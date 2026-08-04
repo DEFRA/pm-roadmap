@@ -10,7 +10,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 
 from .models import Team, ObjectiveSet, Roadmap, Organisation
-from .forms import TeamForm
+from .forms import TeamForm, TeamRoadmapForm
 
 
 def team_list(request):
@@ -51,6 +51,21 @@ def _team_form(request, instance):
         'form': form,
         'team': instance if instance.pk else None,
     })
+
+
+def team_roadmap_create(request, pk):
+    """Create a roadmap owned by this team (owning_team set, so the team's OKRs
+    sync onto it). Defaults to a service/product roadmap."""
+    team = get_object_or_404(Team, pk=pk)
+    form = TeamRoadmapForm(request.POST or None, initial={'roadmap_type': Roadmap.SERVICE})
+    if request.method == 'POST' and form.is_valid():
+        roadmap = form.save(commit=False)
+        roadmap.owning_team = team
+        roadmap.save()
+        if team.organisation_id:
+            roadmap.organisations.add(team.organisation)
+        return redirect('roadmap:detail', pk=roadmap.pk)
+    return render(request, 'roadmap/team_roadmap_form.html', {'form': form, 'team': team})
 
 
 def team_create(request):

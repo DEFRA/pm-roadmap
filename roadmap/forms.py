@@ -7,8 +7,19 @@ first-class Team (a dropdown) rather than resolved from the current user.
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models import Objective, ObjectiveSet, KeyResult, Team, Organisation
+from .models import Objective, ObjectiveSet, KeyResult, Team, Organisation, Roadmap
 from . import okr_periods
+
+
+class TeamRoadmapForm(forms.ModelForm):
+    """Minimal form to create a roadmap owned by a team (from the team page)."""
+    class Meta:
+        model = Roadmap
+        fields = ['name', 'roadmap_type']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Licensing Service Roadmap'}),
+            'roadmap_type': forms.Select(attrs={'class': 'form-input'}),
+        }
 
 
 class TeamForm(forms.ModelForm):

@@ -34,6 +34,17 @@ class TeamPageTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'Licensing')
 
+    def test_team_creates_roadmap_it_owns(self):
+        from roadmap.models import Roadmap
+        team = Team.objects.create(organisation=self.org, name='Licensing')
+        res = self.client.post(reverse('roadmap:team_roadmap_create', args=[team.pk]), {
+            'name': 'Licensing Service Roadmap', 'roadmap_type': Roadmap.SERVICE,
+        })
+        rm = Roadmap.objects.get(name='Licensing Service Roadmap')
+        self.assertEqual(rm.owning_team, team)
+        self.assertIn(self.org, rm.organisations.all())
+        self.assertRedirects(res, reverse('roadmap:detail', args=[rm.pk]), fetch_redirect_response=False)
+
 
 class ObjectiveSetPageTests(TestCase):
     def setUp(self):
