@@ -1,10 +1,14 @@
 from django.urls import path
+from django.views.generic import RedirectView
+
 from . import views, api, views_okr, views_team
 
 app_name = 'roadmap'
 
 urlpatterns = [
-    path('', views.roadmap_list, name='list'),
+    # Landing page redirects to Teams for now (temporary 302 — easy to change).
+    path('', RedirectView.as_view(pattern_name='roadmap:team_list', permanent=False), name='home'),
+    path('roadmaps/', views.roadmap_list, name='list'),
     path('health', api.health, name='health'),
 
     # ── Standalone OKR pages ──

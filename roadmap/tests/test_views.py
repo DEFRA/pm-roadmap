@@ -147,7 +147,11 @@ class ListViewTests(TestCase):
         Roadmap.objects.create(name='Beta')
 
     def test_list_renders_with_context(self):
-        res = self.client.get('/')
+        res = self.client.get('/roadmaps/')
         self.assertEqual(res.status_code, 200)
         self.assertIn('roadmaps_json', res.context)
         self.assertIn('organisations', res.context)
+
+    def test_root_redirects_to_teams(self):
+        res = self.client.get('/')
+        self.assertRedirects(res, '/teams/', fetch_redirect_response=False)
