@@ -101,17 +101,29 @@ def _objective_form(request, objective):
     formset = KeyResultFormSet(request.POST or None, instance=objective)
 
     if request.method == 'POST' and form.is_valid() and formset.is_valid():
-        obj = form.save()
+        obj = form.save(commit=False)
+        # The objective inherits its set's team (team isn't asked for).
+        obj.team = obj.objective_set.team if obj.objective_set_id else None
+        obj.save()
         formset.instance = obj
         formset.save()
         if obj.objective_set_id:
             return redirect('roadmap:objective_set_detail', pk=obj.objective_set_id)
         return redirect('roadmap:objective_list')
 
+    # The set (from the instance or the submitted/queried value) drives the team
+    # breadcrumb back to the team page.
+    obj_set = objective.objective_set if objective.objective_set_id else None
+    if obj_set is None:
+        set_val = form['objective_set'].value()
+        if set_val:
+            obj_set = ObjectiveSet.objects.filter(pk=set_val).first()
     return render(request, 'roadmap/objective_form.html', {
         'form': form,
         'formset': formset,
         'objective': objective if objective.pk else None,
+        'objective_set': obj_set,
+        'team': obj_set.team if obj_set else None,
     })
 
 

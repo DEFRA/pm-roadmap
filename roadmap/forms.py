@@ -152,12 +152,12 @@ def set_form_seed(form):
 
 
 class ObjectiveForm(forms.ModelForm):
+    # Team is not asked for — an objective inherits its set's team (set in the view).
     class Meta:
         model = Objective
-        fields = ['objective_set', 'team', 'title', 'description']
+        fields = ['objective_set', 'title', 'description']
         widgets = {
             'objective_set': forms.Select(attrs={'class': 'form-input'}),
-            'team': forms.Select(attrs={'class': 'form-input'}),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Objective title'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
@@ -168,8 +168,6 @@ class ObjectiveForm(forms.ModelForm):
         self.fields['objective_set'].required = False
         self.fields['objective_set'].label = 'Set'
         self.fields['objective_set'].empty_label = 'No set'
-        self.fields['team'].required = False
-        self.fields['team'].empty_label = 'No team'
 
 
 class KeyResultForm(forms.ModelForm):
@@ -202,5 +200,5 @@ class KeyResultForm(forms.ModelForm):
 
 
 KeyResultFormSet = inlineformset_factory(
-    Objective, KeyResult, form=KeyResultForm, extra=1, can_delete=True,
+    Objective, KeyResult, form=KeyResultForm, extra=2, can_delete=True,
 )
