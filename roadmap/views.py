@@ -232,7 +232,7 @@ def roadmap_detail(request, pk):
         # Item-type (sub-lane) visibility filter
         'visible_tracks': visible_tracks,
         'selected_tracks_str': selected_tracks_str,
-        'track_filter_labels': [('activity', 'Activity'), ('milestone', 'Milestone'), ('metric', 'Metric')],
+        'track_filter_labels': [('activity', 'Activity'), ('milestone', 'Milestone'), ('metric', 'Key Result')],
         'first_visible_track': first_visible_track,
         'last_visible_track': last_visible_track,
         'show_parking': show_parking,

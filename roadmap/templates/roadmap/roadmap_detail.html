@@ -225,7 +225,7 @@
             {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
             <span class="gantt-lane-name">{{ lane.name }}</span>
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
-          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Metrics</span>
+          <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Key Results</span>
         </div>
         {% if show_parking %}<div class="gantt-parking-lot gantt-parking-lot--empty" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}"></div>{% endif %}
         <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
