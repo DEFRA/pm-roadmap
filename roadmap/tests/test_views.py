@@ -192,3 +192,38 @@ class DetailFilterTests(TestCase):
         # month (start snaps to day 1, so compare at month granularity).
         res = self.client.get(f'/{self.rm.pk}/?start=1990-01-01')
         self.assertEqual(res.context['range_start_iso'][:7], res.context['range_min_iso'][:7])
+
+
+class ParkingLotTests(TestCase):
+    """Undated activities/milestones land in the parking lot, not dropped."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='Parking RM', roadmap_type=Roadmap.GROUP)
+        tag = Tag.objects.create(name='Ops', tag_type=Tag.ORGANISATION, roadmap=self.rm)
+        # A dated activity (plots on the timeline) and an undated one (parks).
+        dated = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Dated A',
+                                    start_date=date(2026, 8, 1), end_date=date(2026, 9, 1))
+        parked = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Parked A')
+        undated_ms = Item.objects.create(roadmap=self.rm, item_type=Item.MILESTONE, title='Parked M')
+        for i in (dated, parked, undated_ms):
+            i.tags.add(tag)
+
+    def _ops_lane(self, ctx):
+        return next(l for l in ctx['lanes'] if l['name'] == 'Ops')
+
+    def test_undated_items_go_to_parking(self):
+        ctx = self.client.get(f'/{self.rm.pk}/?group_by=organisation').context
+        self.assertTrue(ctx['show_parking'])
+        lane = self._ops_lane(ctx)
+        parked = [e['item'].title for e in lane['tracks']['activities']['parking']]
+        self.assertEqual(parked, ['Parked A'])
+        # The dated activity is a normal bar, not parked.
+        self.assertEqual([b['item'].title for b in lane['tracks']['activities']['bars']], ['Dated A'])
+        # The undated milestone parks in the milestones track.
+        self.assertEqual([e['item'].title for e in lane['tracks']['milestones']['parking']], ['Parked M'])
+
+    def test_metrics_never_park(self):
+        ctx = self.client.get(f'/{self.rm.pk}/?group_by=organisation').context
+        lane = self._ops_lane(ctx)
+        self.assertEqual(lane['tracks']['metrics']['parking'], [])

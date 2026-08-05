@@ -756,3 +756,38 @@ textarea.form-input { resize: vertical; line-height: 1.5; }
 /* Item-type (sub-lane) filter chips — the legend doubles as toggles. */
 .track-filter { cursor: pointer; }
 .track-filter--off { opacity: 0.3; filter: grayscale(0.85); }
+
+/* ── Parking lot: undated activities/milestones, sticky beside the labels ──── */
+.gantt-header-parking {
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  height: var(--gantt-header-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  position: sticky;
+  left: 180px;
+  top: 0;
+  z-index: 25;
+}
+.gantt-parking-lot {
+  position: sticky;
+  left: 180px;
+  z-index: 12;
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+/* Parked bars fill the parking column (no date position of their own). */
+.gantt-bar--parking {
+  left: 4px;
+  right: 4px;
+  width: auto;
+}

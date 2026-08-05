@@ -198,7 +198,8 @@
 
   {# ── Gantt chart ─────────────────────────────────────────────── #}
   <div class="gantt-wrapper">
-    <div class="gantt" style="min-width: {{ gantt_min_width_px }}px;">
+    <div class="gantt{% if show_parking %} gantt--parking{% endif %}"
+         style="min-width: {{ gantt_min_width_px }}px;{% if show_parking %} grid-template-columns: 180px 1fr {{ months|length }}fr;{% endif %}">
       <div class="gantt-header-label">
         <select onchange="window.location.href = '?group_by=' + this.value + '&time_scale={{ time_scale }}{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}';"
                 style="background-color: transparent; border: none; color: var(--text-main); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0 16px 0 0; appearance: none; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22%3E%3Cpath fill=%22%23111111%22 d=%22M6 8L0 0h12z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right center;">
@@ -207,6 +208,7 @@
           <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Squads</option>
         </select>
       </div>
+      {% if show_parking %}<div class="gantt-header-parking">Parking lot</div>{% endif %}
       <div class="gantt-header-months">
         {% for month in months %}
           <div class="gantt-month-cell" style="width: {{ month.width_pct }}%;">{{ month.label }}</div>
@@ -225,6 +227,7 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Metrics</span>
         </div>
+        {% if show_parking %}<div class="gantt-parking-lot gantt-parking-lot--empty" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}"></div>{% endif %}
         <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
@@ -253,6 +256,13 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Milestones</span>
         </div>
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% for entry in track.parking %}
+            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-milestone-row-height) + 4px));"
+                 @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
+          {% endfor %}
+        </div>{% endif %}
         <div class="gantt-track gantt-track--milestones" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
@@ -278,6 +288,13 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Activities</span>
         </div>
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% for entry in track.parking %}
+            <div class="gantt-bar gantt-bar--activity gantt-bar--parking {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-row-height) + 4px));"
+                 @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
+          {% endfor %}
+        </div>{% endif %}
         <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}

@@ -171,8 +171,13 @@ def roadmap_detail(request, pk):
 
     item_data = _serialise_items(lanes)
 
-    # Minimum gantt width: 100 px per 30 virtual units
-    gantt_min_width_px = 180 + int(total_v * _BASE_PX_PER_UNIT)
+    # Parking lot column (undated activities/milestones) — always shown; it is
+    # roughly one month wide beside the timeline.
+    show_parking = True
+    timeline_px = int(total_v * _BASE_PX_PER_UNIT)
+    parking_col_px = int(timeline_px / len(columns)) if (show_parking and columns) else 0
+    # Minimum gantt width: label col + optional parking col + timeline.
+    gantt_min_width_px = 180 + parking_col_px + timeline_px
 
     # roadmap.tags is the single source of truth for what is "on" this roadmap.
     # Header pills + manage-tags selection both derive from it.
@@ -230,6 +235,7 @@ def roadmap_detail(request, pk):
         'track_filter_labels': [('activity', 'Activity'), ('milestone', 'Milestone'), ('metric', 'Metric')],
         'first_visible_track': first_visible_track,
         'last_visible_track': last_visible_track,
+        'show_parking': show_parking,
         'custom_range': bool(custom_start or custom_end),
         # Date-window filter (values + selectable range for the toolbar inputs)
         'range_start_iso': timeline_start.isoformat(),
@@ -444,6 +450,18 @@ def _date_to_virtual_pct(d, columns, total_v):
 
 # ── Bar / swimlane helpers ────────────────────────────────────────────────────
 
+def _is_parking_item(item):
+    """Activity or milestone missing a start or end date — shown in the parking
+    lot beside the timeline rather than dropped."""
+    if item.item_type not in (Item.ACTIVITY, Item.MILESTONE):
+        return False
+    return not item.start_date or not item.end_date
+
+
+def _parking_entries(items):
+    return [{'item': item, 'row': i} for i, item in enumerate(items)]
+
+
 def _item_to_bar(item, columns, total_v):
     if not item.start_date or not item.end_date:
         return None
@@ -576,6 +594,7 @@ def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
     (KeyResult model bars); metric items assigned to it also plot on the metrics
     track. Activities/milestones plot on their own tracks as usual."""
     tracks = {'activities': [], 'milestones': [], 'metrics': []}
+    parking_by_type = {'activities': [], 'milestones': [], 'metrics': []}
 
     kr_titles = set()
     if objective is not None and obj_set is not None and obj_set.start_date and obj_set.end_date:
@@ -586,6 +605,12 @@ def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
                 tracks['metrics'].append(bar)
 
     for item in obj_items:
+        if _is_parking_item(item):
+            if item.item_type == Item.ACTIVITY:
+                parking_by_type['activities'].append(item)
+            elif item.item_type == Item.MILESTONE:
+                parking_by_type['milestones'].append(item)
+            continue
         bar = _item_to_bar(item, columns, total_v)
         if bar is None:
             continue
@@ -600,17 +625,8 @@ def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
                 continue
             tracks['metrics'].append(bar)
 
-    timeline_px = total_v * _BASE_PX_PER_UNIT
-    stacked_tracks = {}
-    for track_name, bars in tracks.items():
-        if track_name == 'milestones':
-            stacked, row_count = _stack_milestones(bars, timeline_px)
-        else:
-            stacked, row_count = _stack_bars(bars)
-        stacked_tracks[track_name] = {'bars': stacked, 'row_count': max(row_count, 1)}
-
-    return {'name': name, 'tag_id': None,
-            'objective_id': objective.pk if objective else None, 'tracks': stacked_tracks}
+    return _stack_tracks(tracks, parking_by_type, total_v, name,
+                         objective_id=objective.pk if objective else None)
 
 
 def _build_objective_swimlanes(roadmap, items, columns, total_v):
@@ -694,9 +710,33 @@ def _serialise_items(lanes):
     return data
 
 
+def _stack_tracks(tracks, parking_by_type, total_v, name, tag_id=None, objective_id=None):
+    """Stack each track's bars into rows and attach its parking-lot entries.
+    Shared by the tag-based and objective-based lane builders."""
+    timeline_px = total_v * _BASE_PX_PER_UNIT
+    stacked_tracks = {}
+    for track_name, bars in tracks.items():
+        if track_name == 'milestones':
+            stacked, row_count = _stack_milestones(bars, timeline_px)
+        else:
+            stacked, row_count = _stack_bars(bars)
+        parking = _parking_entries(parking_by_type.get(track_name, []))
+        if parking:
+            row_count = max(row_count, len(parking), 1)
+        stacked_tracks[track_name] = {'bars': stacked, 'parking': parking, 'row_count': max(row_count, 1)}
+    return {'name': name, 'tag_id': tag_id, 'objective_id': objective_id, 'tracks': stacked_tracks}
+
+
 def _make_lane(name, item_list, columns, total_v, tag_id=None):
     tracks = {'activities': [], 'milestones': [], 'metrics': []}
+    parking_by_type = {'activities': [], 'milestones': [], 'metrics': []}
     for item in item_list:
+        if _is_parking_item(item):
+            if item.item_type == Item.ACTIVITY:
+                parking_by_type['activities'].append(item)
+            elif item.item_type == Item.MILESTONE:
+                parking_by_type['milestones'].append(item)
+            continue
         bar = _item_to_bar(item, columns, total_v)
         if bar is None:
             continue
@@ -707,16 +747,4 @@ def _make_lane(name, item_list, columns, total_v, tag_id=None):
         elif item.item_type == Item.METRIC:
             tracks['metrics'].append(bar)
 
-    # Timeline width in px (at the gantt's minimum width) — the conservative
-    # case for label overlap, since a wider viewport only spreads things out.
-    timeline_px = total_v * _BASE_PX_PER_UNIT
-
-    stacked_tracks = {}
-    for track_name, bars in tracks.items():
-        if track_name == 'milestones':
-            stacked, row_count = _stack_milestones(bars, timeline_px)
-        else:
-            stacked, row_count = _stack_bars(bars)
-        stacked_tracks[track_name] = {'bars': stacked, 'row_count': max(row_count, 1)}
-
-    return {'name': name, 'tag_id': tag_id, 'tracks': stacked_tracks}
+    return _stack_tracks(tracks, parking_by_type, total_v, name, tag_id=tag_id)
