@@ -100,9 +100,10 @@ def roadmap_detail(request, pk):
     range_max = _shift_years(today, 10)
 
     from . import access
+    applied_sets = list(access.applied_objective_sets(roadmap))
     dated_items = [i for i in items if i.start_date and i.end_date]
     end_candidates = [i.end_date for i in dated_items]
-    end_candidates += [s.end_date for s in access.applied_objective_sets(roadmap) if s.end_date]
+    end_candidates += [s.end_date for s in applied_sets if s.end_date]
 
     default_start = _quarter_start(today)
     default_end = _quarter_end(max(end_candidates)) if end_candidates \
@@ -195,6 +196,13 @@ def roadmap_detail(request, pk):
     org_pool = Tag.objects.filter(tag_type=Tag.ORGANISATION, roadmap=roadmap)
     category_pool = Tag.objects.filter(tag_type=Tag.CATEGORY, roadmap__isnull=True)
 
+    # Objective entities on this roadmap (synced sets + directly-linked), for the
+    # header "Objectives" pills. Falls back to objective tags when there are none.
+    _direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
+    _set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
+    standalone_objectives = [o for o in _direct_objectives if o.pk not in _set_objective_ids]
+    has_roadmap_objectives = bool(applied_sets or standalone_objectives)
+
     def tag_min(t):
         return {'id': t.pk, 'name': t.name, 'colour': t.colour, 'tag_type': t.tag_type}
 
@@ -237,6 +245,10 @@ def roadmap_detail(request, pk):
         'last_visible_track': last_visible_track,
         'show_parking': show_parking,
         'custom_range': bool(custom_start or custom_end),
+        # Header "Objectives" pills sourced from the objective entities on the roadmap.
+        'applied_sets': applied_sets,
+        'standalone_objectives': standalone_objectives,
+        'has_roadmap_objectives': has_roadmap_objectives,
         # Date-window filter (values + selectable range for the toolbar inputs)
         'range_start_iso': timeline_start.isoformat(),
         'range_end_iso': timeline_end.isoformat(),
@@ -586,6 +598,7 @@ def _kr_bar(kr, obj_set, columns, total_v):
     if bar is None:
         return None  # set has no timeframe — the key result can't be placed
     return {'kr_title': kr.title, 'kr_id': kr.pk, 'kr_progress': kr.progress,
+            'kr_objective_id': kr.objective_id,
             'left_pct': bar['left_pct'], 'width_pct': bar['width_pct']}
 
 

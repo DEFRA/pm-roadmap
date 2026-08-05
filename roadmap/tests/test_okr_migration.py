@@ -128,3 +128,38 @@ class SyncedKeyResultPlottingTests(TestCase):
         self.rm.save(update_fields=['sync_okrs'])
         res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
         self.assertNotContains(res, 'Median wait (days)')
+
+
+class RoadmapObjectiveHeaderTests(TestCase):
+    """Synced objectives appear in the header pills and KR bars link to the
+    objective + key result view (objective_edit)."""
+
+    def setUp(self):
+        from roadmap.models import ObjectiveSet, KeyResult
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.set = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date='2026-07-01', end_date='2026-09-30',
+        )
+        self.obj = Objective.objects.create(objective_set=self.set, team=self.team, title='Speed up licensing')
+        self.kr = KeyResult.objects.create(objective=self.obj, title='Median wait (days)',
+                                           start_value=45, target_value=20, current_value=30)
+        self.rm = Roadmap.objects.create(name='Licensing RM', roadmap_type=Roadmap.SERVICE,
+                                         owning_team=self.team, sync_okrs=True)
+        self.rm.organisations.add(self.org)
+
+    def test_synced_objective_in_header_and_context(self):
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        self.assertTrue(res.context['has_roadmap_objectives'])
+        self.assertIn(self.set, res.context['applied_sets'])
+        # The objective title appears as a header pill linking to objective_edit.
+        edit_url = f'/objectives/{self.obj.pk}/edit/'
+        self.assertContains(res, f'href="{edit_url}"')
+        self.assertContains(res, 'Speed up licensing')
+
+    def test_kr_bar_links_to_objective_view(self):
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        # The key result bar is an anchor to the objective (edit) view.
+        self.assertContains(res, f'/objectives/{self.obj.pk}/edit/')
+        self.assertContains(res, 'gantt-bar--kr')
