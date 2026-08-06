@@ -34,21 +34,30 @@ class ItemInline(admin.TabularInline):
 
 @admin.register(Roadmap)
 class RoadmapAdmin(admin.ModelAdmin):
-    list_display = ['name', 'team', 'roadmap_type', 'created_at']
-    list_filter = ['roadmap_type']
-    search_fields = ['name', 'team']
+    list_display = ['name', 'owning_team', 'roadmap_type', 'created_at']
+    list_filter = ['roadmap_type', 'owning_team']
+    search_fields = ['name', 'team', 'owning_team__name']
     filter_horizontal = ['tags', 'organisations']
+    autocomplete_fields = ['owning_team']
     change_list_template = 'admin/roadmap/roadmap/change_list.html'
     fieldsets = [
         (None, {
-            'fields': ['name', 'roadmap_type', 'team', 'organisations', 'description'],
+            'fields': ['name', 'roadmap_type', 'owning_team', 'organisations', 'description'],
+            'description': "Owning team drives OKR sync: that team's objective sets and key "
+                           "results appear on this roadmap. Pick an existing team or use “+” "
+                           "to create a new one.",
         }),
         ('Mission & Vision', {
             'fields': ['mission', 'vision'],
         }),
         ('Tags', {
             'fields': ['tags'],
-            'description': 'Assign Outcome / Gov Objective / Team / Objective tags directly to this roadmap.',
+            'description': 'Assign Outcome / Gov Objective / Squad / Objective tags directly to this roadmap.',
+        }),
+        ('Legacy', {
+            'fields': ['team'],
+            'classes': ['collapse'],
+            'description': 'Old free-text team label — superseded by Owning team above. Kept for reference.',
         }),
     ]
     inlines = [ItemInline]
