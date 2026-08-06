@@ -1,0 +1,52 @@
+{% extends "roadmap/base.html" %}
+{% load static %}
+{% block title %}Teams{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div x-data="teamList()" style="max-width:820px; margin:0 auto;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+    <h1 style="margin:0;">Teams</h1>
+    <a href="{% url 'roadmap:team_create' %}" class="btn btn-primary">+ New team</a>
+  </div>
+
+  {% if teams %}
+    {# ── Filter bar ── #}
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.25rem; align-items:center;">
+      <input type="search" x-model="searchName" placeholder="Search by name (3+ letters)…"
+             aria-label="Search teams by name"
+             style="flex:1; min-width:200px; padding:8px 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:14px;" />
+      <select x-model="selectedOrg" aria-label="Filter by organisation"
+              style="padding:8px 10px; border:1px solid var(--border-mid); border-radius:6px; font-size:14px;">
+        <option value="">All organisations</option>
+        {% for org in organisations %}
+          <option value="{{ org.pk }}">{{ org.name }}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="btn btn-ghost" x-show="searchName || selectedOrg" @click="clearFilters()">Clear</button>
+    </div>
+
+    <template x-for="team in filteredTeams" :key="team.id">
+      <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
+        <a :href="'/teams/' + team.id + '/'" style="font-weight:600; font-size:16px;" x-text="team.name"></a>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;" x-text="team.org_name"></div>
+      </div>
+    </template>
+
+    <div x-show="filteredTeams.length === 0" style="margin-top:1rem;">
+      <p style="color:var(--text-muted);">No teams match your filters.</p>
+      <button type="button" class="btn btn-ghost" style="margin-top:0.5rem;" @click="clearFilters()">Clear filters</button>
+    </div>
+  {% else %}
+    <p style="color:var(--text-muted);">No teams yet. Create one to own objectives and roadmaps.</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>window.TEAMS = {{ teams_json|safe }};</script>
+<script src="{% static 'js/team-list.js' %}"></script>
+{% endblock %}

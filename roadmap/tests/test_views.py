@@ -5,7 +5,8 @@ from django.test import TestCase, Client
 from roadmap.models import Organisation, Roadmap, Item, Tag
 from roadmap.views import (
     _build_months, _build_quarters, _build_hybrid, _build_virtual_timeline,
-    _date_to_virtual_pct, _item_to_bar, _stack_milestones,
+    _date_to_virtual_pct, _pct_to_date, _item_to_bar, _stack_milestones,
+    _apply_manual_rows,
 )
 
 
@@ -73,6 +74,26 @@ class ColumnBuilderTests(TestCase):
         bar = _item_to_bar(item, cols, total_v)
         self.assertGreaterEqual(bar['left_pct'], 0)
         self.assertLessEqual(bar['left_pct'] + bar['width_pct'], 100.01)
+
+    def test_pct_to_date_round_trips_mid_month(self):
+        cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))
+        total_v = _build_virtual_timeline(cols)
+        target = date(2026, 6, 15)
+        pct = _date_to_virtual_pct(target, cols, total_v)
+        back = _pct_to_date(pct, cols, total_v)
+        self.assertEqual(back, target)
+
+    def test_apply_manual_rows_overrides_auto_stack(self):
+        class _I:
+            def __init__(self, row):
+                self.row = row
+        bars = [{'item': _I(2), 'row': 0}, {'item': _I(None), 'row': 1}]
+        parking = [{'item': _I(3), 'row': 0}]
+        count = _apply_manual_rows(bars, parking)
+        self.assertEqual(bars[0]['row'], 2)
+        self.assertEqual(bars[1]['row'], 1)
+        self.assertEqual(parking[0]['row'], 3)
+        self.assertEqual(count, 4)
 
     def test_item_without_dates_has_no_bar(self):
         cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))
@@ -147,7 +168,94 @@ class ListViewTests(TestCase):
         Roadmap.objects.create(name='Beta')
 
     def test_list_renders_with_context(self):
-        res = self.client.get('/')
+        res = self.client.get('/roadmaps/')
         self.assertEqual(res.status_code, 200)
         self.assertIn('roadmaps_json', res.context)
         self.assertIn('organisations', res.context)
+
+    def test_root_redirects_to_teams(self):
+        res = self.client.get('/')
+        self.assertRedirects(res, '/teams/', fetch_redirect_response=False)
+
+
+class DetailFilterTests(TestCase):
+    """Date-window + item-type (track) filters on the roadmap detail view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='Filters RM', roadmap_type=Roadmap.SERVICE)
+        Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='A1',
+                            start_date=date(2026, 8, 1), end_date=date(2026, 9, 30))
+
+    def test_track_filter_limits_visible_tracks(self):
+        res = self.client.get(f'/{self.rm.pk}/?tracks=activity')
+        self.assertEqual(res.context['visible_tracks'], {'activity'})
+        self.assertEqual(res.context['selected_tracks_str'], 'activity')
+        self.assertEqual(res.context['first_visible_track'], 'activity')
+
+    def test_all_tracks_selected_is_no_filter(self):
+        res = self.client.get(f'/{self.rm.pk}/?tracks=activity,milestone,metric')
+        self.assertEqual(res.context['visible_tracks'], {'activity', 'milestone', 'metric'})
+        self.assertEqual(res.context['selected_tracks_str'], '')  # all == no filter
+
+    def test_no_track_param_shows_all(self):
+        res = self.client.get(f'/{self.rm.pk}/')
+        self.assertEqual(res.context['visible_tracks'], {'activity', 'milestone', 'metric'})
+
+    def test_custom_date_window_applied(self):
+        res = self.client.get(f'/{self.rm.pk}/?start=2027-01-01&end=2027-06-30')
+        self.assertEqual(res.context['range_start_iso'], '2027-01-01')
+        self.assertEqual(res.context['range_end_iso'], '2027-06-30')
+        self.assertTrue(res.context['custom_range'])
+
+    def test_date_window_clamped_to_range(self):
+        # 1990 is far before range_min (today-1yr); it clamps up to range_min's
+        # month (start snaps to day 1, so compare at month granularity).
+        res = self.client.get(f'/{self.rm.pk}/?start=1990-01-01')
+        self.assertEqual(res.context['range_start_iso'][:7], res.context['range_min_iso'][:7])
+
+
+class ParkingLotTests(TestCase):
+    """Undated activities/milestones land in the parking lot, not dropped."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='Parking RM', roadmap_type=Roadmap.GROUP)
+        tag = Tag.objects.create(name='Ops', tag_type=Tag.ORGANISATION, roadmap=self.rm)
+        # A dated activity (plots on the timeline) and an undated one (parks).
+        dated = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Dated A',
+                                    start_date=date(2026, 8, 1), end_date=date(2026, 9, 1))
+        parked = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Parked A')
+        undated_ms = Item.objects.create(roadmap=self.rm, item_type=Item.MILESTONE, title='Parked M')
+        for i in (dated, parked, undated_ms):
+            i.tags.add(tag)
+
+    def _ops_lane(self, ctx):
+        return next(l for l in ctx['lanes'] if l['name'] == 'Ops')
+
+    def test_undated_items_go_to_parking(self):
+        ctx = self.client.get(f'/{self.rm.pk}/?group_by=organisation').context
+        self.assertTrue(ctx['show_parking'])
+        lane = self._ops_lane(ctx)
+        parked = [e['item'].title for e in lane['tracks']['activities']['parking']]
+        self.assertEqual(parked, ['Parked A'])
+        # The dated activity is a normal bar, not parked.
+        self.assertEqual([b['item'].title for b in lane['tracks']['activities']['bars']], ['Dated A'])
+        # The undated milestone parks in the milestones track.
+        self.assertEqual([e['item'].title for e in lane['tracks']['milestones']['parking']], ['Parked M'])
+
+    def test_metrics_never_park(self):
+        ctx = self.client.get(f'/{self.rm.pk}/?group_by=organisation').context
+        lane = self._ops_lane(ctx)
+        self.assertEqual(lane['tracks']['metrics']['parking'], [])
+
+    def test_parked_items_are_in_item_data(self):
+        import json
+        res = self.client.get(f'/{self.rm.pk}/?group_by=organisation')
+        data = json.loads(res.context['item_data_json'])
+        titles = {d['title'] for d in data.values()}
+        self.assertIn('Parked A', titles)
+        self.assertIn('Dated A', titles)
+        timeline = json.loads(res.context['timeline_json'])
+        self.assertIn('columns', timeline)
+        self.assertTrue(timeline['total_v'])

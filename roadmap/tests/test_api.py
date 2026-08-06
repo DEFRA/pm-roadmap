@@ -155,6 +155,28 @@ class ItemApiTests(ApiTestCase):
         item.refresh_from_db()
         self.assertEqual((item.title, item.size), ('New', 'L'))
 
+    def test_update_item_dates_and_row(self):
+        item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='Move me',
+                                   start_date='2026-08-01', end_date='2026-08-15')
+        res = self.put(f'/api/items/{item.pk}/', {
+            'start_date': '2026-09-01', 'end_date': '2026-09-20', 'row': 2,
+        })
+        self.assertEqual(res.status_code, 200)
+        item.refresh_from_db()
+        self.assertEqual(item.start_date.isoformat(), '2026-09-01')
+        self.assertEqual(item.end_date.isoformat(), '2026-09-20')
+        self.assertEqual(item.row, 2)
+
+    def test_clear_dates_parks_item(self):
+        item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='Park me',
+                                   start_date='2026-08-01', end_date='2026-08-15')
+        res = self.put(f'/api/items/{item.pk}/', {'start_date': '', 'end_date': '', 'row': 1})
+        self.assertEqual(res.status_code, 200)
+        item.refresh_from_db()
+        self.assertIsNone(item.start_date)
+        self.assertIsNone(item.end_date)
+        self.assertEqual(item.row, 1)
+
     def test_bad_date_returns_400(self):
         res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {
             'item_type': 'activity', 'title': 'BadDate', 'start_date': '01-07-2026',

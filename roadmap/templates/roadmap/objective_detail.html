@@ -1,0 +1,65 @@
+{% extends "roadmap/base.html" %}
+{% block title %}Objective: {{ objective.title }}{% endblock %}
+
+{% block content %}
+<div style="max-width:720px; margin:0 auto;">
+  <div style="font-size:12px; color:var(--text-muted); margin-bottom:0.5rem;">
+    {% if team %}
+      <a href="{% url 'roadmap:team_home' team.pk %}" style="color:inherit;">{{ team.name }}</a>
+      {% if objective_set %} &rsaquo; <a href="{% url 'roadmap:objective_set_detail' objective_set.pk %}" style="color:inherit;">{{ objective_set.name }}</a>{% endif %}
+    {% elif objective_set %}
+      <a href="{% url 'roadmap:objective_list' %}" style="color:inherit;">Objectives</a>
+      &rsaquo; <a href="{% url 'roadmap:objective_set_detail' objective_set.pk %}" style="color:inherit;">{{ objective_set.name }}</a>
+    {% else %}
+      <a href="{% url 'roadmap:objective_list' %}" style="color:inherit;">Objectives</a>
+    {% endif %}
+  </div>
+
+  <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.75rem;">
+    <h1 style="margin:0;">Objective: {{ objective.title }}</h1>
+    <div style="display:flex; gap:6px; flex-shrink:0;">
+      {% if prev_objective %}
+        <a href="{% url 'roadmap:objective_detail' prev_objective.pk %}" class="roadmap-header__add"
+           title="Previous: {{ prev_objective.title }}" aria-label="Previous objective">&#8592;</a>
+      {% endif %}
+      {% if next_objective %}
+        <a href="{% url 'roadmap:objective_detail' next_objective.pk %}" class="roadmap-header__add"
+           title="Next: {{ next_objective.title }}" aria-label="Next objective">&#8594;</a>
+      {% endif %}
+      <a href="{% url 'roadmap:objective_edit' objective.pk %}" class="roadmap-header__add"
+         title="Edit objective" aria-label="Edit objective">&#9998;</a>
+    </div>
+  </div>
+
+  {% if objective_set %}
+    <div style="font-size:13px; color:var(--text-muted); margin-bottom:1rem;">
+      {% include "roadmap/_okr_period_line.html" with set=objective_set %}
+    </div>
+  {% endif %}
+
+  {% if objective.description %}
+    <div style="margin-bottom:1.5rem; white-space:pre-wrap;">{{ objective.description }}</div>
+  {% endif %}
+
+  <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0 0 0.75rem;">Key results</h2>
+
+  {% for kr in objective.key_results.all %}
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
+      <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:baseline;">
+        <div style="font-weight:600;">{{ kr.title }}</div>
+        <span style="font-size:12px; font-weight:600; white-space:nowrap;{% if kr.status == 'off_track' %} color:var(--accent-danger);{% elif kr.status == 'at_risk' %} color:var(--accent-warning);{% else %} color:var(--accent-green);{% endif %}">{{ kr.get_status_display }}</span>
+      </div>
+      <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">
+        {{ kr.current_value|floatformat:"-2" }} / {{ kr.target_value|floatformat:"-2" }}{{ kr.unit }}
+        &middot; {{ kr.progress }}%
+        &middot; start {{ kr.start_value|floatformat:"-2" }}{{ kr.unit }}
+      </div>
+      <div style="height:8px; background:var(--border-subtle); border-radius:4px; overflow:hidden; margin-top:8px;">
+        <div style="height:100%; width:{{ kr.progress }}%; background:{% if kr.status == 'off_track' %}var(--accent-danger){% elif kr.status == 'at_risk' %}var(--accent-warning){% else %}var(--color-metric, #00af41){% endif %};"></div>
+      </div>
+    </div>
+  {% empty %}
+    <p style="color:var(--text-muted);">No key results yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

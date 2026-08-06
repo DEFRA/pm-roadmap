@@ -45,7 +45,20 @@ def roadmap_detail(request, pk):
     time_scale = request.GET.get('time_scale', 'months')
     selected_categories_str = request.GET.get('categories', '')
 
-    items = roadmap.items.prefetch_related('tags', 'linked_activities').all()
+    # Item-type (sub-lane) visibility filter. Absent / all three selected = show all.
+    ALL_TRACKS = ['metric', 'milestone', 'activity']
+    selected_tracks = [t for t in request.GET.get('tracks', '').split(',') if t in ALL_TRACKS]
+    if len(set(selected_tracks)) == len(ALL_TRACKS):
+        selected_tracks = []  # all selected == no filter
+    selected_tracks_str = ','.join(selected_tracks)
+    visible_tracks = set(selected_tracks) if selected_tracks else set(ALL_TRACKS)
+    # Sub-lanes render in this order; the lane name/handle sits on the first
+    # visible one and the lane-separator border on the last visible one.
+    _track_order = ['metric', 'milestone', 'activity']
+    first_visible_track = next((t for t in _track_order if t in visible_tracks), None)
+    last_visible_track = next((t for t in reversed(_track_order) if t in visible_tracks), None)
+
+    items = roadmap.items.select_related('objective').prefetch_related('tags', 'linked_activities').all()
 
     # Parse and filter by multiple categories if selected (comma-separated IDs)
     selected_category_ids = []
@@ -58,22 +71,64 @@ def roadmap_detail(request, pk):
         except (ValueError, Tag.DoesNotExist):
             selected_category_ids = []
 
-    # Timeline always starts at the current month (or quarter start for quarters view)
+    # ── Timeline window ──────────────────────────────────────────────────────
+    # Default: start of the current quarter → end of the quarter containing the
+    # last-ending item (or synced set). The user can override with ?start / ?end,
+    # constrained to one year back and ten years forward from today.
     today = date.today()
-    if time_scale == 'quarters':
-        q_start_month = ((today.month - 1) // 3) * 3 + 1
-        timeline_start = today.replace(month=q_start_month, day=1)
-    else:
-        timeline_start = today.replace(day=1)
 
-    # Timeline end comes from the latest item end_date
+    def _quarter_start(d):
+        return d.replace(month=((d.month - 1) // 3) * 3 + 1, day=1)
+
+    def _quarter_end(d):
+        m = ((d.month - 1) // 3) * 3 + 3
+        return d.replace(month=m, day=calendar.monthrange(d.year, m)[1])
+
+    def _shift_years(d, years):
+        try:
+            return d.replace(year=d.year + years)
+        except ValueError:  # 29 Feb in a non-leap target year
+            return d.replace(year=d.year + years, day=28)
+
+    def _parse_iso(s):
+        try:
+            return date.fromisoformat(s)
+        except (TypeError, ValueError):
+            return None
+
+    range_min = _shift_years(today, -1)
+    range_max = _shift_years(today, 10)
+
+    from . import access
+    applied_sets = list(access.applied_objective_sets(roadmap))
     dated_items = [i for i in items if i.start_date and i.end_date]
-    if dated_items:
-        max_date = max(i.end_date for i in dated_items)
-        last_day = calendar.monthrange(max_date.year, max_date.month)[1]
-        timeline_end = max_date.replace(day=last_day)
-    else:
-        timeline_end = (timeline_start + timedelta(days=365)).replace(day=1) - timedelta(days=1)
+    end_candidates = [i.end_date for i in dated_items]
+    end_candidates += [s.end_date for s in applied_sets if s.end_date]
+
+    default_start = _quarter_start(today)
+    default_end = _quarter_end(max(end_candidates)) if end_candidates \
+        else _quarter_end(_shift_years(default_start, 1) - timedelta(days=1))
+    if default_end < default_start:
+        default_end = _quarter_end(default_start)
+
+    custom_start = _parse_iso(request.GET.get('start'))
+    custom_end = _parse_iso(request.GET.get('end'))
+    timeline_start = custom_start or default_start
+    timeline_end = custom_end or default_end
+
+    # Clamp to the selectable window and snap to whole months (gantt columns).
+    timeline_start = min(max(timeline_start, range_min), range_max).replace(day=1)
+    timeline_end = min(max(timeline_end, range_min), range_max)
+    timeline_end = timeline_end.replace(day=calendar.monthrange(timeline_end.year, timeline_end.month)[1])
+    if timeline_end < timeline_start:
+        timeline_end = _quarter_end(timeline_start)
+
+    # Query-string fragment so toolbar links keep a custom window.
+    date_qs = ''
+    if custom_start:
+        date_qs += f'&start={custom_start.isoformat()}'
+    if custom_end:
+        date_qs += f'&end={custom_end.isoformat()}'
 
     if time_scale == 'quarters':
         columns = _build_quarters(timeline_start, timeline_end)
@@ -105,15 +160,25 @@ def roadmap_detail(request, pk):
         'gov_objective': Tag.GOV_OBJECTIVE,
         'objective': Tag.OBJECTIVE,
     }
-    tag_type = tag_type_map.get(group_by, Tag.OUTCOME)
     if group_by not in tag_type_map and group_by != 'outcome':
         group_by = 'outcome'
-    lanes = _build_swimlanes(items, tag_type, columns, total_v)
+    if group_by == 'objective':
+        # Objectives are first-class entities (not tags): lanes come from the
+        # objectives synced/linked to this roadmap; items sit under item.objective.
+        lanes = _build_objective_swimlanes(roadmap, items, columns, total_v)
+    else:
+        tag_type = tag_type_map.get(group_by, Tag.OUTCOME)
+        lanes = _build_swimlanes(items, tag_type, columns, total_v)
 
     item_data = _serialise_items(lanes)
 
-    # Minimum gantt width: 100 px per 30 virtual units
-    gantt_min_width_px = 180 + int(total_v * _BASE_PX_PER_UNIT)
+    # Parking lot column (undated activities/milestones) — always shown; it is
+    # roughly one month wide beside the timeline.
+    show_parking = True
+    timeline_px = int(total_v * _BASE_PX_PER_UNIT)
+    parking_col_px = int(timeline_px / len(columns)) if (show_parking and columns) else 0
+    # Minimum gantt width: label col + optional parking col + timeline.
+    gantt_min_width_px = 180 + parking_col_px + timeline_px
 
     # roadmap.tags is the single source of truth for what is "on" this roadmap.
     # Header pills + manage-tags selection both derive from it.
@@ -130,6 +195,14 @@ def roadmap_detail(request, pk):
     outcome_pool = Tag.objects.filter(tag_type=Tag.OUTCOME, roadmap__isnull=True)
     org_pool = Tag.objects.filter(tag_type=Tag.ORGANISATION, roadmap=roadmap)
     category_pool = Tag.objects.filter(tag_type=Tag.CATEGORY, roadmap__isnull=True)
+
+    # Objective entities on this roadmap (synced sets + directly-linked), for the
+    # header "Objectives" pills. Falls back to objective tags when there are none.
+    _direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
+    _set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
+    standalone_objectives = [o for o in _direct_objectives if o.pk not in _set_objective_ids]
+    has_roadmap_objectives = bool(applied_sets or standalone_objectives)
+    modal_objectives = [obj for s in applied_sets for obj in s.objectives.all()] + standalone_objectives
 
     def tag_min(t):
         return {'id': t.pk, 'name': t.name, 'colour': t.colour, 'tag_type': t.tag_type}
@@ -165,13 +238,53 @@ def roadmap_detail(request, pk):
         'roadmap_category_tags': category_pool.filter(items__roadmap=roadmap).distinct().order_by('name'),
         'selected_category_ids': selected_category_ids,
         'selected_categories_str': selected_categories_str,
+        # Item-type (sub-lane) visibility filter
+        'visible_tracks': visible_tracks,
+        'selected_tracks_str': selected_tracks_str,
+        'track_filter_labels': [('activity', 'Activity'), ('milestone', 'Milestone'), ('metric', 'Key Result')],
+        'first_visible_track': first_visible_track,
+        'last_visible_track': last_visible_track,
+        'show_parking': show_parking,
+        'custom_range': bool(custom_start or custom_end),
+        # Header "Objectives" pills sourced from the objective entities on the roadmap.
+        'applied_sets': applied_sets,
+        'standalone_objectives': standalone_objectives,
+        'has_roadmap_objectives': has_roadmap_objectives,
+        'modal_objectives': modal_objectives,
+        'objectives_json': json.dumps([
+            {
+                'id': o.pk,
+                'title': o.title,
+                'set_name': o.objective_set.name if o.objective_set_id else '',
+            }
+            for o in modal_objectives
+        ]),
+        # Date-window filter (values + selectable range for the toolbar inputs)
+        'range_start_iso': timeline_start.isoformat(),
+        'range_end_iso': timeline_end.isoformat(),
+        'range_min_iso': range_min.isoformat(),
+        'range_max_iso': range_max.isoformat(),
+        'date_qs': date_qs,
+        'timeline_json': json.dumps({
+            'total_v': total_v,
+            'columns': [
+                {
+                    'start': c['start'].isoformat(),
+                    'end': c['end'].isoformat(),
+                    'v_start': c['v_start'],
+                    'v_end': c['v_end'],
+                    'virt_days': c['virt_days'],
+                    'width_pct': c['width_pct'],
+                }
+                for c in columns
+            ],
+        }),
         # JSON seeds for the modals
         'manage_json': json.dumps({
             'objective_type': objective_type,
             'objective_label': objective_label,
             'objective_creatable': objective_creatable,
             'pools': {
-                objective_type: [tag_min(t) for t in objective_pool],
                 'outcome': [tag_min(t) for t in outcome_pool],
                 'organisation': [tag_min(t) for t in org_pool],
             },
@@ -179,7 +292,6 @@ def roadmap_detail(request, pk):
         }),
         'item_tag_pools_json': json.dumps({
             'outcome': [tag_min(t) for t in outcome_pool],
-            objective_type: [tag_min(t) for t in objective_pool],
             'organisation': [tag_min(t) for t in org_pool],
             'category': [tag_min(t) for t in category_pool],
         }),
@@ -370,7 +482,34 @@ def _date_to_virtual_pct(d, columns, total_v):
     return 0.0 if (not columns or d < columns[0]['start']) else 100.0
 
 
+def _pct_to_date(pct, columns, total_v):
+    """Inverse of _date_to_virtual_pct: map a % position back to a calendar date."""
+    if not columns:
+        return None
+    pct = max(0.0, min(100.0, float(pct)))
+    v_pos = pct / 100.0 * total_v
+    for i, col in enumerate(columns):
+        is_last = i == len(columns) - 1
+        if col['v_start'] <= v_pos < col['v_end'] or (is_last and v_pos <= col['v_end']):
+            frac = (v_pos - col['v_start']) / col['virt_days'] if col['virt_days'] else 0
+            span = (col['end'] - col['start']).days
+            return col['start'] + timedelta(days=round(frac * span))
+    return columns[-1]['end']
+
+
 # ── Bar / swimlane helpers ────────────────────────────────────────────────────
+
+def _is_parking_item(item):
+    """Activity or milestone missing a start or end date — shown in the parking
+    lot beside the timeline rather than dropped."""
+    if item.item_type not in (Item.ACTIVITY, Item.MILESTONE):
+        return False
+    return not item.start_date or not item.end_date
+
+
+def _parking_entries(items):
+    return [{'item': item, 'row': i} for i, item in enumerate(items)]
+
 
 def _item_to_bar(item, columns, total_v):
     if not item.start_date or not item.end_date:
@@ -482,46 +621,207 @@ def _build_swimlanes(items, tag_type, columns, total_v):
     return lanes
 
 
+class _KrSpan:
+    """Adapter that lends a key result the timeframe of its objective's set, so a
+    KeyResult (which has no dates of its own) can be placed on the timeline via
+    _item_to_bar — the key result bar spans the whole set period."""
+    def __init__(self, obj_set):
+        self.start_date = obj_set.start_date
+        self.end_date = obj_set.end_date
+
+
+def _kr_bar(kr, obj_set, columns, total_v):
+    bar = _item_to_bar(_KrSpan(obj_set), columns, total_v)
+    if bar is None:
+        return None  # set has no timeframe — the key result can't be placed
+    return {'kr_title': kr.title, 'kr_id': kr.pk, 'kr_progress': kr.progress,
+            'kr_objective_id': kr.objective_id,
+            'left_pct': bar['left_pct'], 'width_pct': bar['width_pct']}
+
+
+def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
+    """A lane for one roadmap objective. Its key results span the set timeframe
+    (KeyResult model bars); metric items assigned to it also plot on the metrics
+    track. Activities/milestones plot on their own tracks as usual."""
+    tracks = {'activities': [], 'milestones': [], 'metrics': []}
+    parking_by_type = {'activities': [], 'milestones': [], 'metrics': []}
+
+    kr_titles = set()
+    if objective is not None and obj_set is not None and obj_set.start_date and obj_set.end_date:
+        for kr in objective.key_results.all():
+            kr_titles.add(kr.title)
+            bar = _kr_bar(kr, obj_set, columns, total_v)
+            if bar is not None:
+                tracks['metrics'].append(bar)
+
+    for item in obj_items:
+        if _is_parking_item(item):
+            if item.item_type == Item.ACTIVITY:
+                parking_by_type['activities'].append(item)
+            elif item.item_type == Item.MILESTONE:
+                parking_by_type['milestones'].append(item)
+            continue
+        bar = _item_to_bar(item, columns, total_v)
+        if bar is None:
+            continue
+        if item.item_type == Item.ACTIVITY:
+            tracks['activities'].append(bar)
+        elif item.item_type == Item.MILESTONE:
+            tracks['milestones'].append(bar)
+        elif item.item_type == Item.METRIC:
+            # In a set lane a metric item that backs a key result is already
+            # drawn as the KeyResult bar — don't double it.
+            if item.title in kr_titles:
+                continue
+            tracks['metrics'].append(bar)
+
+    return _stack_tracks(tracks, parking_by_type, total_v, name,
+                         objective_id=objective.pk if objective else None)
+
+
+def _build_objective_swimlanes(roadmap, items, columns, total_v):
+    """Swim lanes grouped by Objective entity. Objectives come from the roadmap's
+    synced objective sets (access.applied_objective_sets) and any objectives
+    linked directly; each objective's key results plot across its set's period,
+    and items sit in the lane of their item.objective. Unassigned items fall into
+    an 'Unassigned' lane."""
+    from . import access
+
+    applied_sets = list(access.applied_objective_sets(roadmap))
+    direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
+    set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
+    standalone = [o for o in direct_objectives if o.pk not in set_objective_ids]
+
+    lane_specs = []  # (objective or None, owning set or None)
+    for obj_set in applied_sets:
+        objectives = list(obj_set.objectives.all())
+        if not objectives:
+            lane_specs.append((None, obj_set))  # empty-set placeholder
+        for objective in objectives:
+            lane_specs.append((objective, obj_set))
+    for objective in standalone:
+        lane_specs.append((objective, None))
+    lane_specs.sort(key=lambda pair: (
+        pair[0] is None,
+        pair[0].sort_order if pair[0] is not None else 0,
+        pair[0].title if pair[0] is not None else '',
+    ))
+
+    lanes = []
+    shown_ids = set()
+    for objective, obj_set in lane_specs:
+        if objective is None:
+            lanes.append(_make_objective_lane('No objectives yet', None, [], obj_set, columns, total_v))
+            continue
+        shown_ids.add(objective.pk)
+        obj_items = [i for i in items if i.objective_id == objective.pk]
+        lanes.append(_make_objective_lane(objective.title, objective, obj_items, obj_set, columns, total_v))
+
+    unassigned = [i for i in items if i.objective_id is None or i.objective_id not in shown_ids]
+    if unassigned:
+        lanes.append(_make_objective_lane('Unassigned', None, unassigned, None, columns, total_v))
+    return lanes
+
+
+def _item_modal_dict(item):
+    return {
+        'id': item.pk,
+        'title': item.title,
+        'item_type': item.item_type,
+        'item_type_display': item.get_item_type_display(),
+        'description': item.description,
+        'priority': item.priority,
+        'priority_display': item.get_priority_display() if item.priority else '',
+        'size': item.size,
+        'start_date': item.start_date.strftime('%d %b %Y') if item.start_date else '',
+        'end_date': item.end_date.strftime('%d %b %Y') if item.end_date else '',
+        '_start_iso': item.start_date.isoformat() if item.start_date else '',
+        '_end_iso': item.end_date.isoformat() if item.end_date else '',
+        'objective': item.objective_id,
+        'objective_title': item.objective.title if item.objective_id else '',
+        'row': item.row,
+        'prd_link': item.prd_link,
+        'backlog_link': item.backlog_link,
+        'tags': [
+            {'id': t.pk, 'name': t.name, 'tag_type': t.tag_type, 'colour': t.colour}
+            for t in item.tags.all()
+        ],
+        'linked_activities': [
+            {'id': a.pk, 'title': a.title}
+            for a in item.linked_activities.all()
+        ],
+    }
+
+
 def _serialise_items(lanes):
     seen = set()
     data = {}
     for lane in lanes:
         for track in lane['tracks'].values():
             for bar in track['bars']:
-                item = bar['item']
+                item = bar.get('item')
+                if item is None or item.pk in seen:  # key-result bars have no item
+                    continue
+                seen.add(item.pk)
+                data[item.pk] = _item_modal_dict(item)
+            for entry in track['parking']:
+                item = entry['item']
                 if item.pk in seen:
                     continue
                 seen.add(item.pk)
-                data[item.pk] = {
-                    'id': item.pk,
-                    'title': item.title,
-                    'item_type': item.item_type,
-                    'item_type_display': item.get_item_type_display(),
-                    'description': item.description,
-                    'priority': item.priority,
-                    'priority_display': item.get_priority_display() if item.priority else '',
-                    'size': item.size,
-                    'start_date': item.start_date.strftime('%d %b %Y') if item.start_date else '',
-                    'end_date': item.end_date.strftime('%d %b %Y') if item.end_date else '',
-                    '_start_iso': item.start_date.isoformat() if item.start_date else '',
-                    '_end_iso': item.end_date.isoformat() if item.end_date else '',
-                    'prd_link': item.prd_link,
-                    'backlog_link': item.backlog_link,
-                    'tags': [
-                        {'id': t.pk, 'name': t.name, 'tag_type': t.tag_type, 'colour': t.colour}
-                        for t in item.tags.all()
-                    ],
-                    'linked_activities': [
-                        {'id': a.pk, 'title': a.title}
-                        for a in item.linked_activities.all()
-                    ],
-                }
+                data[item.pk] = _item_modal_dict(item)
     return data
+
+
+def _apply_manual_rows(stacked, parking):
+    """Honour Item.row when set; return the resulting row_count."""
+    for bar in stacked:
+        item = bar.get('item')
+        if item is not None and item.row is not None:
+            bar['row'] = item.row
+    for entry in parking:
+        if entry['item'].row is not None:
+            entry['row'] = entry['item'].row
+    rows = [b.get('row', 0) for b in stacked] + [e.get('row', 0) for e in parking]
+    return max(rows) + 1 if rows else 1
+
+
+def _stack_tracks(tracks, parking_by_type, total_v, name, tag_id=None, objective_id=None):
+    """Stack each track's bars into rows and attach its parking-lot entries.
+    Shared by the tag-based and objective-based lane builders."""
+    timeline_px = total_v * _BASE_PX_PER_UNIT
+    stacked_tracks = {}
+    for track_name, bars in tracks.items():
+        if track_name == 'milestones':
+            stacked, _auto_rows = _stack_milestones(bars, timeline_px)
+        else:
+            stacked, _auto_rows = _stack_bars(bars)
+        parking = _parking_entries(parking_by_type.get(track_name, []))
+        row_count = _apply_manual_rows(stacked, parking)
+        stacked_tracks[track_name] = {'bars': stacked, 'parking': parking, 'row_count': max(row_count, 1)}
+    if objective_id:
+        lane_key = f'obj-{objective_id}'
+    elif tag_id:
+        lane_key = f'tag-{tag_id}'
+    else:
+        slug = ''.join(ch if ch.isalnum() else '-' for ch in name).strip('-').lower() or 'lane'
+        lane_key = f'none-{slug}'
+    return {
+        'name': name, 'tag_id': tag_id, 'objective_id': objective_id,
+        'lane_key': lane_key, 'tracks': stacked_tracks,
+    }
 
 
 def _make_lane(name, item_list, columns, total_v, tag_id=None):
     tracks = {'activities': [], 'milestones': [], 'metrics': []}
+    parking_by_type = {'activities': [], 'milestones': [], 'metrics': []}
     for item in item_list:
+        if _is_parking_item(item):
+            if item.item_type == Item.ACTIVITY:
+                parking_by_type['activities'].append(item)
+            elif item.item_type == Item.MILESTONE:
+                parking_by_type['milestones'].append(item)
+            continue
         bar = _item_to_bar(item, columns, total_v)
         if bar is None:
             continue
@@ -532,16 +832,4 @@ def _make_lane(name, item_list, columns, total_v, tag_id=None):
         elif item.item_type == Item.METRIC:
             tracks['metrics'].append(bar)
 
-    # Timeline width in px (at the gantt's minimum width) — the conservative
-    # case for label overlap, since a wider viewport only spreads things out.
-    timeline_px = total_v * _BASE_PX_PER_UNIT
-
-    stacked_tracks = {}
-    for track_name, bars in tracks.items():
-        if track_name == 'milestones':
-            stacked, row_count = _stack_milestones(bars, timeline_px)
-        else:
-            stacked, row_count = _stack_bars(bars)
-        stacked_tracks[track_name] = {'bars': stacked, 'row_count': max(row_count, 1)}
-
-    return {'name': name, 'tag_id': tag_id, 'tracks': stacked_tracks}
+    return _stack_tracks(tracks, parking_by_type, total_v, name, tag_id=tag_id)

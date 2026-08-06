@@ -7,11 +7,14 @@
 {% endblock %}
 
 {% block content %}
-<div x-data="roadmapList()" @keydown.escape.window="closeNew()" style="max-width: 700px; margin: 0 auto;">
+<div x-data="roadmapList()" style="max-width: 700px; margin: 0 auto;">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
     <h1 style="margin:0;">Roadmaps</h1>
-    <button type="button" class="btn btn-primary" @click="openNew()">+ New Roadmap</button>
+    <a href="{% url 'roadmap:team_list' %}" class="btn btn-ghost">Add via a team</a>
   </div>
+  <p style="font-size:13px; color:var(--text-muted); margin:-0.75rem 0 1.5rem;">
+    Roadmaps are created from a team's page, so each one is owned by a team. Open a team to add one.
+  </p>
 
   {# ── Filter bar ── #}
   <div style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.25rem; align-items:center;">
@@ -57,59 +60,9 @@
   {% else %}
     <div class="empty-state">
       <p>No roadmaps yet.</p>
-      <button type="button" class="btn btn-primary" style="margin-top:1rem;" @click="openNew()">Create your first roadmap</button>
+      <a href="{% url 'roadmap:team_list' %}" class="btn btn-primary" style="margin-top:1rem;">Open a team to create one</a>
     </div>
   {% endif %}
-
-  {# ── New roadmap modal ── #}
-  <template x-if="showNew">
-    <div class="modal-overlay" @click.self="closeNew()">
-      <div class="modal-card" style="max-width:460px;">
-        <button class="modal-close" @click="closeNew()" aria-label="Close">&times;</button>
-        <div class="modal-card__title" style="margin-bottom:1rem;">New roadmap</div>
-
-        <div class="modal-card__section">
-          <label class="modal-card__section-label">Name</label>
-          <input x-model="form.name" type="text" required placeholder="e.g. 2025-30 Strategic Roadmap" class="form-input" />
-        </div>
-        <div class="modal-card__section">
-          <label class="modal-card__section-label">Type</label>
-          <select x-model="form.roadmap_type" required class="form-input">
-            <option value="">Select a type…</option>
-            <option value="group">Group</option>
-            <option value="service">Service/Product</option>
-          </select>
-        </div>
-        <div class="modal-card__section">
-          <label class="modal-card__section-label">Team</label>
-          <input x-model="form.team" type="text" placeholder="e.g. Delivery Group" class="form-input" />
-        </div>
-        <div class="modal-card__section">
-          <label class="modal-card__section-label">Organisations</label>
-          <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            {% for org in organisations %}
-              <label class="modal-org-option"
-                     :class="form.organisations.includes('{{ org.pk }}') ? 'modal-org-option--selected' : ''">
-                <input type="checkbox" value="{{ org.pk }}" x-model="form.organisations" style="display:none;" />
-                {{ org.name }}
-              </label>
-            {% empty %}
-              <span style="font-size:13px; color:var(--text-muted);">No organisations yet (add some in Admin).</span>
-            {% endfor %}
-          </div>
-        </div>
-        <div class="modal-card__section">
-          <label class="modal-card__section-label">Description</label>
-          <textarea x-model="form.description" rows="2" class="form-input"></textarea>
-        </div>
-
-        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-          <button type="button" class="btn btn-primary" @click="saveNew()">Create</button>
-          <button type="button" class="btn btn-ghost" @click="closeNew()">Cancel</button>
-        </div>
-      </div>
-    </div>
-  </template>
 </div>
 {% endblock %}
 

@@ -1,0 +1,56 @@
+{# One key-result form's fields. Expects `kr` (a formset form or empty_form). #}
+{% for hidden in kr.hidden_fields %}{{ hidden }}{% endfor %}
+{% if kr.non_field_errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.non_field_errors }}</div>{% endif %}
+
+<button type="button" class="kr-remove no-export" onclick="removeKrForm(this)"
+        title="Remove this key result" aria-label="Remove this key result"
+        style="position:absolute; top:6px; right:6px; width:22px; height:22px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-main); color:var(--text-muted); cursor:pointer; line-height:1;">&times;</button>
+
+{# Title + unit #}
+<div style="display:grid; grid-template-columns:2fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.title.label }}</label>
+    {{ kr.title }}
+    {% if kr.title.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.title.errors }}</div>{% endif %}
+  </div>
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.unit.label }}</label>
+    {{ kr.unit }}
+    {% if kr.unit.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.unit.errors }}</div>{% endif %}
+  </div>
+</div>
+
+{# Start / target / current values on one line #}
+<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:0.5rem; margin-bottom:0.5rem;">
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.start_value.label }}</label>
+    {{ kr.start_value }}
+    {% if kr.start_value.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.start_value.errors }}</div>{% endif %}
+  </div>
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.target_value.label }}</label>
+    {{ kr.target_value }}
+    {% if kr.target_value.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.target_value.errors }}</div>{% endif %}
+  </div>
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.current_value.label }}</label>
+    {{ kr.current_value }}
+    {% if kr.current_value.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.current_value.errors }}</div>{% endif %}
+  </div>
+</div>
+
+{# Direction / status #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.direction.label }}</label>
+    {{ kr.direction }}
+    {% if kr.direction.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.direction.errors }}</div>{% endif %}
+  </div>
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.status.label }}</label>
+    {{ kr.status }}
+    {% if kr.status.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.status.errors }}</div>{% endif %}
+  </div>
+</div>
+
+{% if kr.DELETE %}<span style="display:none;">{{ kr.DELETE }}</span>{% endif %}

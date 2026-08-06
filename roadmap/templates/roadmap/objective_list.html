@@ -1,0 +1,41 @@
+{% extends "roadmap/base.html" %}
+{% block title %}Objectives{% endblock %}
+
+{% block content %}
+<div style="max-width:820px; margin:0 auto;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+    <h1 style="margin:0;">Objectives</h1>
+    <a href="{% url 'roadmap:team_list' %}" class="btn btn-ghost">Add via a team</a>
+  </div>
+  <p style="font-size:13px; color:var(--text-muted); margin:-0.75rem 0 1.5rem;">
+    Objective sets are created from a team's page. Open a team to add one.
+  </p>
+
+  <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted);">Objectives and Key Results</h2>
+  {% for set in objective_sets %}
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem;">
+        <div>
+          <a href="{% url 'roadmap:objective_set_detail' set.pk %}" style="font-weight:600; font-size:16px;">{{ set.name }}</a>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+            {% include "roadmap/_okr_period_line.html" with set=set %}
+            &middot; {{ set.get_scope_display }}{% if set.team %} &middot; {{ set.team.name }}{% endif %}
+            &middot; {{ set.organisation.name }}
+            &middot; {{ set.objectives.count }} objective{{ set.objectives.count|pluralize }}
+          </div>
+        </div>
+        <a href="{% url 'roadmap:objective_set_detail' set.pk %}" class="btn btn-ghost" style="font-size:12px;">Open</a>
+      </div>
+    </div>
+  {% empty %}
+    <p style="color:var(--text-muted);">No objective sets yet.</p>
+  {% endfor %}
+
+  <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:2rem;">Objectives without a set</h2>
+  {% for objective in unassigned %}
+    {% include "roadmap/_objective_card.html" with objective=objective %}
+  {% empty %}
+    <p style="color:var(--text-muted);">None — every objective belongs to a set.</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "roadmap/base.html" %}
+{% block title %}{% if objective %}Edit objective{% else %}New objective{% endif %}{% endblock %}
+
+{% block content %}
+<div style="max-width:640px; margin:0 auto;">
+  {% if team %}
+    <div style="font-size:12px; color:var(--text-muted); margin-bottom:0.5rem;">
+      <a href="{% url 'roadmap:team_home' team.pk %}" style="color:inherit;">{{ team.name }}</a>
+      {% if objective_set %} &rsaquo; <a href="{% url 'roadmap:objective_set_detail' objective_set.pk %}" style="color:inherit;">{{ objective_set.name }}</a>{% endif %}
+      {% if objective %} &rsaquo; <a href="{% url 'roadmap:objective_detail' objective.pk %}" style="color:inherit;">{{ objective.title }}</a>{% endif %}
+      &rsaquo; {% if objective %}Edit{% else %}New objective{% endif %}
+    </div>
+  {% endif %}
+  <h1 style="margin:0 0 1.25rem;">{% if objective %}Edit objective{% else %}New objective{% endif %}</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div style="color:var(--priority-critical); margin-bottom:1rem;">{{ form.non_field_errors }}</div>{% endif %}
+
+    {% for field in form %}
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<div style="font-size:12px; color:var(--priority-critical); margin-top:2px;">{{ field.errors }}</div>{% endif %}
+      </div>
+    {% endfor %}
+
+    <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:1.5rem;">Key results</h2>
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<div style="color:var(--priority-critical);">{{ formset.non_form_errors }}</div>{% endif %}
+
+    <div id="kr-forms" style="display:flex; flex-direction:column; gap:0.75rem;">
+      {% for kr in formset %}
+        <div class="kr-form" style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem; position:relative;">
+          {% include "roadmap/_kr_form_fields.html" with kr=kr %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {# Template cloned by "+ Add another key result" #}
+    <template id="kr-empty-template">
+      <div class="kr-form" style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem; position:relative;">
+        {% include "roadmap/_kr_form_fields.html" with kr=formset.empty_form %}
+      </div>
+    </template>
+
+    <button type="button" class="btn btn-ghost" onclick="addKrForm()" style="margin-top:0.5rem;">+ Add another key result</button>
+
+    <div style="display:flex; gap:8px; margin-top:1.5rem;">
+      <button type="submit" class="btn btn-primary">Save</button>
+      <a href="{% if objective %}{% url 'roadmap:objective_detail' objective.pk %}{% elif objective_set %}{% url 'roadmap:objective_set_detail' objective_set.pk %}{% else %}{% url 'roadmap:objective_list' %}{% endif %}" class="btn btn-ghost">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  function addKrForm() {
+    const total = document.getElementById('id_key_results-TOTAL_FORMS');
+    const index = parseInt(total.value, 10);
+    const html = document.getElementById('kr-empty-template').innerHTML.replace(/__prefix__/g, index);
+    document.getElementById('kr-forms').insertAdjacentHTML('beforeend', html);
+    total.value = index + 1;
+  }
+  function removeKrForm(btn) {
+    const formEl = btn.closest('.kr-form');
+    const del = formEl.querySelector('input[type=checkbox][name$="-DELETE"]');
+    if (del) del.checked = true;            // saved rows: mark for deletion on save
+    formEl.style.display = 'none';          // new rows: just hide (empty ⇒ ignored)
+  }
+</script>
+{% endblock %}

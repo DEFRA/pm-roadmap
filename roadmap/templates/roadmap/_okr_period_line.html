@@ -1,0 +1,8 @@
+{# Plain-text period + compact dates, e.g. "Annual: Jan - Dec 2026". Expects `set`. #}
+{% if set.start_date and set.end_date and set.start_date.year == set.end_date.year %}
+  {{ set.period_label }}: {{ set.start_date|date:"M" }} - {{ set.end_date|date:"M Y" }}
+{% elif set.start_date or set.end_date %}
+  {{ set.period_label }}: {{ set.start_date|date:"M Y"|default:"—" }} - {{ set.end_date|date:"M Y"|default:"—" }}
+{% else %}
+  {{ set.period_label }}
+{% endif %}

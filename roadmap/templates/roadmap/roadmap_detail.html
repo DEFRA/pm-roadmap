@@ -53,7 +53,7 @@
     {# Tag lists — headings double as swim lane selectors; one edit control #}
     <div style="position:relative; margin-top:0.75rem; grid-column:1 / -1;">
       <button type="button" class="roadmap-header__add no-export" @click="openManage()"
-              title="Manage objectives, outcomes & teams" aria-label="Manage tags"
+              title="Manage objectives, outcomes & squads" aria-label="Manage tags"
               style="position:absolute; top:1rem; right:0;">&#9998;</button>
 
       <div class="roadmap-header__tags" style="grid-template-columns:1fr 1fr 1fr;">
@@ -63,11 +63,26 @@
             {{ objective_label }}
           </a>
           <div class="roadmap-header__pills">
-            {% for tag in roadmap_objective_tags %}
-              <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
-            {% empty %}
-              <span style="font-size:12px; color:var(--text-muted);">None yet</span>
-            {% endfor %}
+            {% if has_roadmap_objectives %}
+              {% for set in applied_sets %}
+                {% for objective in set.objectives.all %}
+                  <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
+                     style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
+                     title="{{ set.name }} · {{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>
+                {% endfor %}
+              {% endfor %}
+              {% for objective in standalone_objectives %}
+                <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
+                   style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
+                   title="{{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>
+              {% endfor %}
+            {% else %}
+              {% for tag in roadmap_objective_tags %}
+                <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
+              {% empty %}
+                <span style="font-size:12px; color:var(--text-muted);">None yet</span>
+              {% endfor %}
+            {% endif %}
           </div>
         </div>
 
@@ -88,7 +103,7 @@
         <div class="roadmap-header__tag-group">
           <a href="?group_by=organisation&time_scale={{ time_scale }}"
              class="roadmap-header__label roadmap-header__label--link {% if group_by == 'organisation' %}roadmap-header__label--active{% endif %}">
-            Teams
+            Squads
           </a>
           <div class="roadmap-header__pills">
             {% for tag in roadmap_org_tags %}
@@ -106,16 +121,34 @@
   <div class="gantt-toolbar">
     <div class="gantt-toolbar__group">
       <span class="gantt-toolbar__label">View by</span>
-      <a href="?group_by={{ group_by }}&time_scale=months{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+      <a href="?group_by={{ group_by }}&time_scale=months{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}"
          class="btn btn-ghost {% if time_scale == 'months' %}btn-ghost--active{% endif %}">Months</a>
-      <a href="?group_by={{ group_by }}&time_scale=quarters{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+      <a href="?group_by={{ group_by }}&time_scale=quarters{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}"
          class="btn btn-ghost {% if time_scale == 'quarters' %}btn-ghost--active{% endif %}">Quarters</a>
-      <a href="?group_by={{ group_by }}&time_scale=hybrid{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}"
+      <a href="?group_by={{ group_by }}&time_scale=hybrid{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}"
          class="btn btn-ghost {% if time_scale == 'hybrid' %}btn-ghost--active{% endif %}">Hybrid</a>
     </div>
+    {# ── Timeline (date) window ── #}
+    <form method="get" class="gantt-toolbar__group no-export" style="gap:0.4rem;">
+      <span class="gantt-toolbar__label">Timeline</span>
+      <input type="hidden" name="group_by" value="{{ group_by }}">
+      <input type="hidden" name="time_scale" value="{{ time_scale }}">
+      {% if selected_categories_str %}<input type="hidden" name="categories" value="{{ selected_categories_str }}">{% endif %}
+      {% if selected_tracks_str %}<input type="hidden" name="tracks" value="{{ selected_tracks_str }}">{% endif %}
+      <input type="date" name="start" value="{{ range_start_iso }}" min="{{ range_min_iso }}" max="{{ range_max_iso }}"
+             class="form-input" style="width:auto; font-size:12px; padding:4px 6px;">
+      <span style="color:var(--text-muted);">&rarr;</span>
+      <input type="date" name="end" value="{{ range_end_iso }}" min="{{ range_min_iso }}" max="{{ range_max_iso }}"
+             class="form-input" style="width:auto; font-size:12px; padding:4px 6px;">
+      <button type="submit" class="btn btn-ghost" style="font-size:11px;">Apply</button>
+      {% if custom_range %}
+        <a href="?group_by={{ group_by }}&time_scale={{ time_scale }}{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}"
+           class="btn btn-ghost" style="font-size:11px;" title="Back to the default window">Reset</a>
+      {% endif %}
+    </form>
     <div class="gantt-toolbar__group no-export" id="category-filters">
       <span class="gantt-toolbar__label">Item Category</span>
-      <a href="?group_by={{ group_by }}&time_scale={{ time_scale }}"
+      <a href="?group_by={{ group_by }}&time_scale={{ time_scale }}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}"
          class="btn btn-ghost {% if not selected_categories_str %}btn-ghost--active{% endif %}">All</a>
       {% for tag in roadmap_category_tags %}
       <a href="javascript:void(0);"
@@ -133,23 +166,42 @@
       if (current.includes(idStr)) current.splice(current.indexOf(idStr), 1);
       else current.push(idStr);
       const param = current.length > 0 ? '&categories=' + current.join(',') : '';
-      window.location.href = '?group_by=' + groupBy + '&time_scale=' + timeScale + param;
+      const tracks = '{{ selected_tracks_str }}';
+      const trackParam = tracks ? '&tracks=' + tracks : '';
+      window.location.href = '?group_by=' + groupBy + '&time_scale=' + timeScale + param + trackParam + '{{ date_qs }}';
     }
     </script>
   </div>
 
-  {# ── Legend ──────────────────────────────────────────────────── #}
-  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center;">
-    <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Legend</span>
-    <span class="gantt-bar gantt-bar--activity" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Activity</span>
-    <span class="gantt-bar gantt-bar--milestone" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Milestone</span>
-    <span class="gantt-bar gantt-bar--metric" style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px;">Key Result</span>
+  {# ── Sub-swim-lane (item type) filters — double as the legend ─── #}
+  <div id="track-filters" style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; align-items:center;">
+    <span class="gantt-toolbar__label no-export">Show</span>
+    <a href="?group_by={{ group_by }}&time_scale={{ time_scale }}{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{{ date_qs }}"
+       class="btn btn-ghost no-export {% if not selected_tracks_str %}btn-ghost--active{% endif %}">All</a>
+    {% for t, label in track_filter_labels %}
+      <a href="javascript:void(0);" onclick="toggleTrackFilter('{{ t }}');"
+         class="track-filter gantt-bar gantt-bar--{{ t }} {% if t not in visible_tracks %}track-filter--off{% endif %}"
+         style="position:static; height:20px; padding:0 8px; font-size:10px; border-radius:4px; text-decoration:none;">{{ label }}</a>
+    {% endfor %}
     <span style="font-size:11px; color:var(--text-muted); margin-left:.5rem;">Priority border: </span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-low); display:inline-block;" title="Low"></span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-medium); display:inline-block;" title="Medium"></span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-high); display:inline-block;" title="High"></span>
     <span style="width:18px; height:18px; border-radius:3px; background:var(--priority-critical); display:inline-block;" title="Critical"></span>
   </div>
+  <script>
+  function toggleTrackFilter(track) {
+    const ALL = ['metric', 'milestone', 'activity'];
+    let current = '{{ selected_tracks_str }}'.split(',').filter(t => ALL.includes(t));
+    if (!current.length) current = ALL.slice();   // "All" state = every track on
+    const i = current.indexOf(track);
+    if (i >= 0) current.splice(i, 1); else current.push(track);
+    const trackParam = (current.length && current.length < ALL.length) ? '&tracks=' + current.join(',') : '';
+    const cats = '{{ selected_categories_str }}';
+    const catParam = cats ? '&categories=' + cats : '';
+    window.location.href = '?group_by={{ group_by }}&time_scale={{ time_scale }}' + catParam + trackParam + '{{ date_qs }}';
+  }
+  </script>
 
   {# ── No items notice ─────────────────────────────────────────── #}
   {% if not lanes %}
@@ -161,15 +213,17 @@
 
   {# ── Gantt chart ─────────────────────────────────────────────── #}
   <div class="gantt-wrapper">
-    <div class="gantt" style="min-width: {{ gantt_min_width_px }}px;">
+    <div class="gantt{% if show_parking %} gantt--parking{% endif %}"
+         style="min-width: {{ gantt_min_width_px }}px;{% if show_parking %} grid-template-columns: 180px 1fr {{ months|length }}fr;{% endif %}">
       <div class="gantt-header-label">
-        <select onchange="window.location.href = '?group_by=' + this.value + '&time_scale={{ time_scale }}';"
+        <select onchange="window.location.href = '?group_by=' + this.value + '&time_scale={{ time_scale }}{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}';"
                 style="background-color: transparent; border: none; color: var(--text-main); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0 16px 0 0; appearance: none; background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22%3E%3Cpath fill=%22%23111111%22 d=%22M6 8L0 0h12z%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right center;">
           <option value="outcome" {% if group_by == 'outcome' %}selected{% endif %}>Defra Outcomes</option>
           <option value="{{ objective_type }}" {% if group_by == objective_type %}selected{% endif %}>{{ objective_label }}</option>
-          <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Teams</option>
+          <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Squads</option>
         </select>
       </div>
+      {% if show_parking %}<div class="gantt-header-parking">Parking lot</div>{% endif %}
       <div class="gantt-header-months">
         {% for month in months %}
           <div class="gantt-month-cell" style="width: {{ month.width_pct }}%;">{{ month.label }}</div>
@@ -178,36 +232,60 @@
 
       {% for lane in lanes %}
         {% comment %}display:contents keeps the 6 cells as grid items while letting JS move the lane as one unit. Only tagged lanes are draggable (not Untagged).{% endcomment %}
-        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %}>
+        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %} data-lane-key="{{ lane.lane_key }}">
+        {% if 'metric' in visible_tracks %}
         {% with track=lane.tracks.metrics %}
-        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);">
-          {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
-          <span class="gantt-lane-name">{{ lane.name }}</span>
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% if first_visible_track == 'metric' %}
+            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            <span class="gantt-lane-name">{{ lane.name }}</span>
+          {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Key Results</span>
         </div>
-        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);">
+        {% if show_parking %}<div class="gantt-parking-lot gantt-parking-lot--empty" data-lane-key="{{ lane.lane_key }}" data-track="metric" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}"></div>{% endif %}
+        <div class="gantt-track" data-lane-key="{{ lane.lane_key }}" data-track="metric" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-bar gantt-bar--metric" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+            {% if bar.item %}
+            <div class="gantt-bar gantt-bar--metric gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
+            {% else %}
+            {# Key result synced from an objective set — opens the read-only objective view #}
+            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
+                 title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · open objective"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
+            {% endif %}
           {% endfor %}
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
         </div>
         {% endwith %}
+        {% endif %}
 
+        {% if 'milestone' in visible_tracks %}
         {% with track=lane.tracks.milestones %}
-        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);">
-          <span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% if first_visible_track == 'milestone' %}
+            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            <span class="gantt-lane-name">{{ lane.name }}</span>
+          {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Milestones</span>
         </div>
-        <div class="gantt-track gantt-track--milestones" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);">
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="milestone" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% for entry in track.parking %}
+            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 data-item-id="{{ entry.item.pk }}" data-item-type="milestone" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
+                 style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-milestone-row-height) + 4px));"
+                 @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
+          {% endfor %}
+        </div>{% endif %}
+        <div class="gantt-track gantt-track--milestones" data-lane-key="{{ lane.lane_key }}" data-track="milestone" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-milestone-marker" style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
+            <div class="gantt-milestone-marker gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="milestone" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="0"
+                 style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})">
               <div class="gantt-milestone-marker__diamond"></div>
               <div class="gantt-milestone-marker__label">{{ bar.item.title|truncatechars:24 }}</div>
@@ -216,24 +294,39 @@
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
         </div>
         {% endwith %}
+        {% endif %}
 
+        {% if 'activity' in visible_tracks %}
         {% with track=lane.tracks.activities %}
-        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle); border-bottom:2px solid var(--border-mid);">
-          <span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>
+        <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% if first_visible_track == 'activity' %}
+            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            <span class="gantt-lane-name">{{ lane.name }}</span>
+          {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Activities</span>
         </div>
-        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2); border-bottom:2px solid var(--border-mid);">
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="activity" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+          {% for entry in track.parking %}
+            <div class="gantt-bar gantt-bar--activity gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 data-item-id="{{ entry.item.pk }}" data-item-type="activity" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
+                 style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-row-height) + 4px));"
+                 @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
+          {% endfor %}
+        </div>{% endif %}
+        <div class="gantt-track" data-lane-key="{{ lane.lane_key }}" data-track="activity" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-bar gantt-bar--activity {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--activity gantt-bar--draggable {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+                 data-item-id="{{ bar.item.pk }}" data-item-type="activity" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}"
                  style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
           {% endfor %}
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
         </div>
         {% endwith %}
+        {% endif %}
         </div>{# end .gantt-lane #}
       {% endfor %}
     </div>
@@ -255,11 +348,14 @@
   window.ITEM_TAG_POOLS = {{ item_tag_pools_json|safe }};
   window.OBJECTIVE_TYPE = {{ objective_type_json|safe }};
   window.ACTIVITIES = {{ activities_json|safe }};
+  window.ROADMAP_OBJECTIVES = {{ objectives_json|safe }};
   window.ORG_OPTIONS = [{% for org in organisations %}{"id": {{ org.pk }}, "name": "{{ org.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
+  window.TIMELINE = {{ timeline_json|safe }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=2"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
+<script src="{% static 'js/item-drag.js' %}"></script>
 {% endblock %}
