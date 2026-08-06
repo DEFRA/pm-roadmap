@@ -135,7 +135,7 @@ class ItemAdmin(admin.ModelAdmin):
         ('Linked Activities', {
             'fields': ['linked_activities'],
             'classes': ['collapse'],
-            'description': 'For milestones and metrics: link to related activities.',
+            'description': 'For milestones and key results: link to related activities.',
         }),
     ]
 

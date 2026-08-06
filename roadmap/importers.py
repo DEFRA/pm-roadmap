@@ -25,6 +25,8 @@ COL_CATEGORIES   = 'Categories'
 COL_LINKED       = 'Linked Activities'
 
 VALID_ITEM_TYPES = {c[0] for c in Item.ITEM_TYPE_CHOICES}
+# Accept the display label "Key Result" (and legacy "metric") for the same stored value.
+ITEM_TYPE_ALIASES = {'key result': Item.METRIC, 'key_result': Item.METRIC}
 VALID_PRIORITIES = {c[0] for c in Item.PRIORITY_CHOICES} | {''}
 VALID_SIZES      = {c[0] for c in Item.SIZE_CHOICES} | {''}
 
@@ -145,6 +147,7 @@ def import_items(file_obj) -> dict:
 
         row_id    = _str(v(COL_ROW_ID))
         item_type = _str(v(COL_ITEM_TYPE)).lower()
+        item_type = ITEM_TYPE_ALIASES.get(item_type, item_type)
         title     = _str(v(COL_TITLE))
 
         # Required fields
@@ -155,7 +158,7 @@ def import_items(file_obj) -> dict:
         if item_type not in VALID_ITEM_TYPES:
             errors.append(
                 f"Row {row_num}: \"{item_type}\" is not a valid Item Type "
-                f"(use: activity, milestone, metric) — row skipped."
+                f"(use: activity, milestone, key result) — row skipped."
             )
             skipped += 1
             continue
@@ -329,7 +332,7 @@ def build_template_workbook() -> openpyxl.Workbook:
     notes_data = [
         ('Column', 'Required?', 'Valid values / format'),
         ('Row ID',        'Recommended', 'Any unique value per row (e.g. 1, 2, 3). Used only to wire Linked Activities.'),
-        ('Item Type',     'Required',    'activity  |  milestone  |  metric'),
+        ('Item Type',     'Required',    'activity  |  milestone  |  key result'),
         ('Title',         'Required',    'Free text. If a row with this title already exists on the roadmap it will be updated.'),
         ('Description',   'Optional',    'Free text.'),
         ('Start Date',    'Optional',    'DD/MM/YYYY'),
@@ -343,7 +346,7 @@ def build_template_workbook() -> openpyxl.Workbook:
         ('Objectives',    'Optional',    'Comma-separated tag names. Roadmap-specific — created automatically if new. Service roadmaps.'),
         ('Teams',         'Optional',    'Comma-separated tag names. Roadmap-specific — created automatically if new.'),
         ('Categories',    'Optional',    'Comma-separated tag names. Central — must already exist (admin-defined).'),
-        ('Linked Activities', 'Optional','Comma-separated Row IDs of activity rows in this upload. Milestones/metrics only.'),
+        ('Linked Activities', 'Optional','Comma-separated Row IDs of activity rows in this upload. Milestones/key results only.'),
     ]
     for r, row in enumerate(notes_data, start=1):
         for c, val in enumerate(row, start=1):
