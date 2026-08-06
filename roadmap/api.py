@@ -44,6 +44,7 @@ def item_to_dict(i):
         'size': i.size,
         'start_date': i.start_date.isoformat() if i.start_date else '',
         'end_date': i.end_date.isoformat() if i.end_date else '',
+        'row': i.row,
         'prd_link': i.prd_link,
         'backlog_link': i.backlog_link,
         'objective': i.objective_id,
@@ -286,6 +287,12 @@ def _apply_item_fields(item, data):
         item.start_date = _parse_date(data['start_date'])
     if 'end_date' in data:
         item.end_date = _parse_date(data['end_date'])
+    if 'row' in data:
+        row = data['row']
+        if row in (None, ''):
+            item.row = None
+        else:
+            item.row = max(0, int(row))
     # Assign to an objective on this roadmap; empty unassigns. Validated against
     # the item's roadmap so only assignable objectives can be linked.
     if 'objective' in data:

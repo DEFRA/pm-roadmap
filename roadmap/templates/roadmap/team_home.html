@@ -25,13 +25,14 @@
     <a href="{% url 'roadmap:team_set_create' team.pk %}" class="btn btn-ghost" style="font-size:12px;">+ New set</a>
   </div>
   {% for set in team_sets %}
-    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem; display:flex; align-items:center; justify-content:space-between;">
-      <div>
-        <a href="{% url 'roadmap:objective_set_detail' set.pk %}" style="font-weight:600;">{{ set.name }}</a>
-        {% include "roadmap/_okr_period_pill.html" with set=set %}
-        <span style="font-size:12px; color:var(--text-muted);"> &middot; {{ set.objectives.count }} objective{{ set.objectives.count|pluralize }}</span>
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem;">
+      <a href="{% url 'roadmap:objective_set_detail' set.pk %}" style="font-weight:600;">{{ set.name }}</a>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+        {% include "roadmap/_okr_period_line.html" with set=set %}
       </div>
-      <a href="{% url 'roadmap:objective_set_detail' set.pk %}" class="btn btn-ghost" style="font-size:12px;">Open</a>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+        {{ set.objectives.count }} Objective{{ set.objectives.count|pluralize }}
+      </div>
     </div>
   {% empty %}
     <p style="color:var(--text-muted);">No objective sets for this team yet.</p>
@@ -42,9 +43,11 @@
     <a href="{% url 'roadmap:team_roadmap_create' team.pk %}" class="btn btn-ghost" style="font-size:12px;">+ New roadmap</a>
   </div>
   {% for rm in team_roadmaps %}
-    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem; display:flex; align-items:center; justify-content:space-between;">
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem;">
       <a href="{% url 'roadmap:detail' rm.pk %}" style="font-weight:600;">{{ rm.name }}</a>
-      <span style="font-size:12px; color:var(--text-muted);">{{ rm.items.count }} item{{ rm.items.count|pluralize }}</span>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+        {{ rm.items.count }} item{{ rm.items.count|pluralize }}
+      </div>
     </div>
   {% empty %}
     <p style="color:var(--text-muted);">No roadmaps owned by this team yet.</p>

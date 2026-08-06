@@ -14,6 +14,7 @@ urlpatterns = [
     # ── Standalone OKR pages ──
     path('objectives/', views_okr.objective_list, name='objective_list'),
     path('objectives/new/', views_okr.objective_create, name='objective_create'),
+    path('objectives/<int:pk>/', views_okr.objective_detail, name='objective_detail'),
     path('objectives/<int:pk>/edit/', views_okr.objective_edit, name='objective_edit'),
     path('objectives/<int:pk>/delete/', views_okr.objective_delete, name='objective_delete'),
     path('objectives/sets/<int:pk>/', views_okr.objective_set_detail, name='objective_set_detail'),

@@ -107,9 +107,7 @@ def _objective_form(request, objective):
         obj.save()
         formset.instance = obj
         formset.save()
-        if obj.objective_set_id:
-            return redirect('roadmap:objective_set_detail', pk=obj.objective_set_id)
-        return redirect('roadmap:objective_list')
+        return redirect('roadmap:objective_detail', pk=obj.pk)
 
     # The set (from the instance or the submitted/queried value) drives the team
     # breadcrumb back to the team page.
@@ -133,6 +131,32 @@ def objective_create(request):
     if set_pk and request.method == 'GET':
         objective.objective_set = ObjectiveSet.objects.filter(pk=set_pk).first()
     return _objective_form(request, objective)
+
+
+def objective_detail(request, pk):
+    """Read-only view of an objective + its key results (most people just read)."""
+    objective = get_object_or_404(
+        Objective.objects.select_related('objective_set', 'team').prefetch_related('key_results'),
+        pk=pk,
+    )
+    next_objective = prev_objective = None
+    obj_set = objective.objective_set
+    if obj_set_id := objective.objective_set_id:
+        # Same order as the set page (newest first) so next/prev match scrolling down/up.
+        siblings = list(
+            Objective.objects.filter(objective_set_id=obj_set_id).order_by('-created_at', 'pk')
+        )
+        index = next((i for i, sib in enumerate(siblings) if sib.pk == objective.pk), None)
+        if index is not None and len(siblings) > 1:
+            next_objective = siblings[(index + 1) % len(siblings)]
+            prev_objective = siblings[(index - 1) % len(siblings)]
+    return render(request, 'roadmap/objective_detail.html', {
+        'objective': objective,
+        'objective_set': obj_set,
+        'team': objective.team,
+        'next_objective': next_objective,
+        'prev_objective': prev_objective,
+    })
 
 
 def objective_edit(request, pk):

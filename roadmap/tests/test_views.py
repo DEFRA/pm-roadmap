@@ -5,7 +5,8 @@ from django.test import TestCase, Client
 from roadmap.models import Organisation, Roadmap, Item, Tag
 from roadmap.views import (
     _build_months, _build_quarters, _build_hybrid, _build_virtual_timeline,
-    _date_to_virtual_pct, _item_to_bar, _stack_milestones,
+    _date_to_virtual_pct, _pct_to_date, _item_to_bar, _stack_milestones,
+    _apply_manual_rows,
 )
 
 
@@ -73,6 +74,26 @@ class ColumnBuilderTests(TestCase):
         bar = _item_to_bar(item, cols, total_v)
         self.assertGreaterEqual(bar['left_pct'], 0)
         self.assertLessEqual(bar['left_pct'] + bar['width_pct'], 100.01)
+
+    def test_pct_to_date_round_trips_mid_month(self):
+        cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))
+        total_v = _build_virtual_timeline(cols)
+        target = date(2026, 6, 15)
+        pct = _date_to_virtual_pct(target, cols, total_v)
+        back = _pct_to_date(pct, cols, total_v)
+        self.assertEqual(back, target)
+
+    def test_apply_manual_rows_overrides_auto_stack(self):
+        class _I:
+            def __init__(self, row):
+                self.row = row
+        bars = [{'item': _I(2), 'row': 0}, {'item': _I(None), 'row': 1}]
+        parking = [{'item': _I(3), 'row': 0}]
+        count = _apply_manual_rows(bars, parking)
+        self.assertEqual(bars[0]['row'], 2)
+        self.assertEqual(bars[1]['row'], 1)
+        self.assertEqual(parking[0]['row'], 3)
+        self.assertEqual(count, 4)
 
     def test_item_without_dates_has_no_bar(self):
         cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))
@@ -227,3 +248,14 @@ class ParkingLotTests(TestCase):
         ctx = self.client.get(f'/{self.rm.pk}/?group_by=organisation').context
         lane = self._ops_lane(ctx)
         self.assertEqual(lane['tracks']['metrics']['parking'], [])
+
+    def test_parked_items_are_in_item_data(self):
+        import json
+        res = self.client.get(f'/{self.rm.pk}/?group_by=organisation')
+        data = json.loads(res.context['item_data_json'])
+        titles = {d['title'] for d in data.values()}
+        self.assertIn('Parked A', titles)
+        self.assertIn('Dated A', titles)
+        timeline = json.loads(res.context['timeline_json'])
+        self.assertIn('columns', timeline)
+        self.assertTrue(timeline['total_v'])

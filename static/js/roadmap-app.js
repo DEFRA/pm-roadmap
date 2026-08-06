@@ -28,6 +28,7 @@ function blankItemForm() {
     id: null, item_type: 'activity', title: '', description: '',
     priority: '', size: '', start_date: '', end_date: '',
     prd_link: '', backlog_link: '', tags: [], linked_activities: [],
+    objective: '',
   };
 }
 
@@ -39,7 +40,11 @@ function roadmapApp() {
     itemTagPools: window.ITEM_TAG_POOLS || {},
     objectiveType: window.OBJECTIVE_TYPE || 'gov_objective',
     activities: window.ACTIVITIES || [],
+    roadmapObjectives: window.ROADMAP_OBJECTIVES || [],
     orgOptions: window.ORG_OPTIONS || [],
+    init() {
+      this.roadmapObjectives = window.ROADMAP_OBJECTIVES || [];
+    },
 
     // ── item view modal ──
     activeItem: null,
@@ -181,6 +186,7 @@ function roadmapApp() {
         prd_link: it.prd_link || '', backlog_link: it.backlog_link || '',
         tags: (it.tags || []).map((t) => t.id),
         linked_activities: (it.linked_activities || []).map((a) => a.id),
+        objective: it.objective ? String(it.objective) : '',
       };
       this.itemFormMode = 'edit';
       this._resetItemPool();
@@ -198,6 +204,10 @@ function roadmapApp() {
     },
     closeItemForm() { this.showItemForm = false; },
     isItemTagSelected(id) { return this.itemForm.tags.includes(id); },
+    selectObjective(id) {
+      const next = String(id);
+      this.itemForm.objective = String(this.itemForm.objective) === next ? '' : next;
+    },
     toggleItemTag(id) {
       const i = this.itemForm.tags.indexOf(id);
       if (i === -1) this.itemForm.tags.push(id); else this.itemForm.tags.splice(i, 1);
@@ -223,6 +233,7 @@ function roadmapApp() {
         end_date: this.itemForm.end_date, prd_link: this.itemForm.prd_link,
         backlog_link: this.itemForm.backlog_link, tags: this.itemForm.tags,
         linked_activities: this.itemForm.linked_activities,
+        objective: this.itemForm.objective ? Number(this.itemForm.objective) : '',
       };
       try {
         if (this.itemFormMode === 'edit') {

@@ -17,9 +17,9 @@
       <div style="display:flex; align-items:center; justify-content:space-between; gap:0.75rem;">
         <div>
           <a href="{% url 'roadmap:objective_set_detail' set.pk %}" style="font-weight:600; font-size:16px;">{{ set.name }}</a>
-          {% include "roadmap/_okr_period_pill.html" with set=set %}
           <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-            {{ set.get_scope_display }}{% if set.team %} &middot; {{ set.team.name }}{% endif %}
+            {% include "roadmap/_okr_period_line.html" with set=set %}
+            &middot; {{ set.get_scope_display }}{% if set.team %} &middot; {{ set.team.name }}{% endif %}
             &middot; {{ set.organisation.name }}
             &middot; {{ set.objectives.count }} objective{{ set.objectives.count|pluralize }}
           </div>

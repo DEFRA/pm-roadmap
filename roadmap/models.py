@@ -216,6 +216,11 @@ class Item(models.Model):
     # Date range – all item types can have dates for timeline placement
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
+    # Manual vertical position within a track. Null = auto-stack by date overlap.
+    row = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Manual row in the track (0 = top). Blank = stack automatically.',
+    )
 
     # Milestones and metrics can link to activities
     linked_activities = models.ManyToManyField(

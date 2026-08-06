@@ -15,6 +15,13 @@
       </div>
       <div class="modal-card__title" x-text="activeItem.title"></div>
 
+      <template x-if="activeItem.objective_title">
+        <div class="modal-card__section">
+          <div class="modal-card__section-label">Objective</div>
+          <div class="modal-card__section-value" x-text="activeItem.objective_title"></div>
+        </div>
+      </template>
+
       <template x-if="activeItem.description">
         <div class="modal-card__section">
           <div class="modal-card__section-label">Description</div>
@@ -218,7 +225,6 @@
       <div class="modal-card__title" style="margin-bottom:1.25rem;">Manage roadmap tags</div>
 
       <template x-for="section in [
-          {type: manage.objective_type, label: manage.objective_label, creatable: manage.objective_creatable},
           {type: 'outcome', label: 'Defra Outcomes', creatable: false},
           {type: 'organisation', label: 'Squads', creatable: true}
         ]" :key="section.type">
@@ -257,8 +263,8 @@
 </template>
 
 {# ── Item create / edit modal ─────────────────────────────────── #}
-<template x-if="showItemForm">
-  <div class="modal-overlay" @click.self="closeItemForm()">
+{# x-show (not x-if): keeps pills in the live DOM so Alpine binds clicks. #}
+<div class="modal-overlay" x-show="showItemForm" x-cloak @click.self="closeItemForm()">
     <div class="modal-card" style="max-width:520px;">
       <button class="modal-close" @click="closeItemForm()" aria-label="Close">&times;</button>
       <div class="modal-card__title" style="margin-bottom:1rem;" x-text="itemFormMode === 'edit' ? 'Edit item' : 'New item'"></div>
@@ -321,13 +327,45 @@
         </div>
       </div>
 
-      {# Tag pickers per type #}
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Defra Outcomes</label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <template x-for="tag in (itemPool.outcome || [])" :key="tag.id">
+            <button type="button" class="modal-tag-pill"
+                    @click="toggleItemTag(tag.id)"
+                    :class="isItemTagSelected(tag.id) ? 'modal-tag-pill--selected' : ''"
+                    :style="isItemTagSelected(tag.id)
+                      ? 'background:' + tag.colour + '; border-color:' + tag.colour + '; color:#fff;'
+                      : 'border-color:' + tag.colour + '; color:' + tag.colour">
+              <span x-text="tag.name"></span>
+            </button>
+          </template>
+          <span x-show="!(itemPool.outcome || []).length" style="font-size:12px; color:var(--text-muted);">None</span>
+        </div>
+      </div>
+
+      <div class="modal-card__section">
+        <label class="modal-card__section-label">Objectives</label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <template x-for="obj in roadmapObjectives" :key="obj.id">
+            <button type="button" class="modal-tag-pill"
+                    @click="selectObjective(obj.id)"
+                    :class="String(itemForm.objective) === String(obj.id) ? 'modal-tag-pill--selected' : ''"
+                    :style="String(itemForm.objective) === String(obj.id)
+                      ? 'background:var(--accent-gold); border-color:var(--accent-gold); color:#fff;'
+                      : 'border-color:var(--accent-gold); color:var(--accent-gold)'"
+                    :title="obj.set_name || ''">
+              <span x-text="obj.title"></span>
+            </button>
+          </template>
+          <span x-show="!roadmapObjectives.length" style="font-size:12px; color:var(--text-muted);">None</span>
+        </div>
+      </div>
+
       <template x-for="section in [
-          {type: 'outcome', label: 'Defra Outcomes', creatable: false},
-          {type: objectiveType, label: objectiveType === 'objective' ? 'Objectives' : 'Gov Objectives', creatable: objectiveType === 'objective'},
           {type: 'organisation', label: 'Squads', creatable: true},
           {type: 'category', label: 'Item Categories', creatable: true}
-        ]" :key="section.type">
+        ]" :key="'after-obj-' + section.type">
         <div class="modal-card__section">
           <label class="modal-card__section-label" x-text="section.label"></label>
           <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
@@ -375,8 +413,7 @@
         <button type="button" class="btn btn-ghost" @click="closeItemForm()">Cancel</button>
       </div>
     </div>
-  </div>
-</template>
+</div>
 
 {# ── Export modal ─────────────────────────────────────────────── #}
 <template x-if="showExport">

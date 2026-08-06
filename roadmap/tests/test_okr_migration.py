@@ -132,7 +132,7 @@ class SyncedKeyResultPlottingTests(TestCase):
 
 class RoadmapObjectiveHeaderTests(TestCase):
     """Synced objectives appear in the header pills and KR bars link to the
-    objective + key result view (objective_edit)."""
+    read-only objective + key result view (objective_detail)."""
 
     def setUp(self):
         from roadmap.models import ObjectiveSet, KeyResult
@@ -153,13 +153,21 @@ class RoadmapObjectiveHeaderTests(TestCase):
         res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
         self.assertTrue(res.context['has_roadmap_objectives'])
         self.assertIn(self.set, res.context['applied_sets'])
-        # The objective title appears as a header pill linking to objective_edit.
-        edit_url = f'/objectives/{self.obj.pk}/edit/'
-        self.assertContains(res, f'href="{edit_url}"')
+        import json
+        seeded = json.loads(res.context['objectives_json'])
+        self.assertEqual([(o['id'], o['title']) for o in seeded], [(self.obj.pk, 'Speed up licensing')])
+        self.assertEqual(list(res.context['modal_objectives']), [self.obj])
+        self.assertIn('Speed up licensing', [o['title'] for o in seeded])
+        self.assertContains(res, 'selectObjective(obj.id)')
+        self.assertContains(res, 'Speed up licensing')
+        self.assertNotIn('objective', json.loads(res.context['item_tag_pools_json']))
+        # The objective title appears as a header pill linking to the read-only view.
+        detail_url = f'/objectives/{self.obj.pk}/'
+        self.assertContains(res, f'href="{detail_url}"')
         self.assertContains(res, 'Speed up licensing')
 
     def test_kr_bar_links_to_objective_view(self):
         res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
-        # The key result bar is an anchor to the objective (edit) view.
-        self.assertContains(res, f'/objectives/{self.obj.pk}/edit/')
+        self.assertContains(res, f'/objectives/{self.obj.pk}/')
+        self.assertNotContains(res, f'/objectives/{self.obj.pk}/edit/')
         self.assertContains(res, 'gantt-bar--kr')

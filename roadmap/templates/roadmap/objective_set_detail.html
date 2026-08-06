@@ -13,7 +13,9 @@
   <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:0.5rem;">
     <h1 style="margin:0;">
       {{ objective_set.name }}
-      {% include "roadmap/_okr_period_pill.html" with set=objective_set %}
+      {% if objective_set.team %}
+        <span class="tag-pill" style="font-size:10px;">{{ objective_set.team.name }}</span>
+      {% endif %}
       {% if objective_set.archived %}<span class="tag-pill" style="font-size:10px; border-color:var(--text-muted); color:var(--text-muted);">Archived</span>{% endif %}
     </h1>
     <div style="display:flex; gap:6px;">
@@ -32,10 +34,8 @@
   </div>
 
   <div style="font-size:13px; color:var(--text-muted); margin-bottom:1rem;">
-    {% if objective_set.start_date or objective_set.end_date %}
-      {{ objective_set.start_date|date:"d M Y"|default:"—" }} &rarr; {{ objective_set.end_date|date:"d M Y"|default:"—" }} &middot;
-    {% endif %}
-    {{ objectives|length }} objective{{ objectives|length|pluralize }}
+    {% include "roadmap/_okr_period_line.html" with set=objective_set %}
+    &middot; {{ objectives|length }} objective{{ objectives|length|pluralize }}
   </div>
 
   {% if roadmaps %}

@@ -66,13 +66,13 @@
             {% if has_roadmap_objectives %}
               {% for set in applied_sets %}
                 {% for objective in set.objectives.all %}
-                  <a href="{% url 'roadmap:objective_edit' objective.pk %}" class="tag-pill tag-pill--clickable"
+                  <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
                      style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
                      title="{{ set.name }} · {{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>
                 {% endfor %}
               {% endfor %}
               {% for objective in standalone_objectives %}
-                <a href="{% url 'roadmap:objective_edit' objective.pk %}" class="tag-pill tag-pill--clickable"
+                <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
                    style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
                    title="{{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>
               {% endfor %}
@@ -232,7 +232,7 @@
 
       {% for lane in lanes %}
         {% comment %}display:contents keeps the 6 cells as grid items while letting JS move the lane as one unit. Only tagged lanes are draggable (not Untagged).{% endcomment %}
-        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %}>
+        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %} data-lane-key="{{ lane.lane_key }}">
         {% if 'metric' in visible_tracks %}
         {% with track=lane.tracks.metrics %}
         <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
@@ -242,18 +242,18 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Key Results</span>
         </div>
-        {% if show_parking %}<div class="gantt-parking-lot gantt-parking-lot--empty" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}"></div>{% endif %}
-        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+        {% if show_parking %}<div class="gantt-parking-lot gantt-parking-lot--empty" data-lane-key="{{ lane.lane_key }}" data-track="metric" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}"></div>{% endif %}
+        <div class="gantt-track" data-lane-key="{{ lane.lane_key }}" data-track="metric" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
             {% if bar.item %}
-            <div class="gantt-bar gantt-bar--metric" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+            <div class="gantt-bar gantt-bar--metric gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
             {% else %}
-            {# Key result synced from an objective set — opens the objective + key results view #}
-            <a href="{% url 'roadmap:objective_edit' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
+            {# Key result synced from an objective set — opens the read-only objective view #}
+            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
                  title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · open objective"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
             {% endif %}
           {% endfor %}
@@ -271,19 +271,21 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Milestones</span>
         </div>
-        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="milestone" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% for entry in track.parking %}
-            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 data-item-id="{{ entry.item.pk }}" data-item-type="milestone" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
                  style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-milestone-row-height) + 4px));"
                  @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
           {% endfor %}
         </div>{% endif %}
-        <div class="gantt-track gantt-track--milestones" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+        <div class="gantt-track gantt-track--milestones" data-lane-key="{{ lane.lane_key }}" data-track="milestone" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-milestone-marker" style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
+            <div class="gantt-milestone-marker gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="milestone" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="0"
+                 style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})">
               <div class="gantt-milestone-marker__diamond"></div>
               <div class="gantt-milestone-marker__label">{{ bar.item.title|truncatechars:24 }}</div>
@@ -303,19 +305,21 @@
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Activities</span>
         </div>
-        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+        {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="activity" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% for entry in track.parking %}
-            <div class="gantt-bar gantt-bar--activity gantt-bar--parking {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--activity gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+                 data-item-id="{{ entry.item.pk }}" data-item-type="activity" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
                  style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
           {% endfor %}
         </div>{% endif %}
-        <div class="gantt-track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
+        <div class="gantt-track" data-lane-key="{{ lane.lane_key }}" data-track="activity" data-zone="track" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           <div class="gantt-track__grid">
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-bar gantt-bar--activity {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--activity gantt-bar--draggable {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+                 data-item-id="{{ bar.item.pk }}" data-item-type="activity" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}"
                  style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
           {% endfor %}
@@ -344,11 +348,14 @@
   window.ITEM_TAG_POOLS = {{ item_tag_pools_json|safe }};
   window.OBJECTIVE_TYPE = {{ objective_type_json|safe }};
   window.ACTIVITIES = {{ activities_json|safe }};
+  window.ROADMAP_OBJECTIVES = {{ objectives_json|safe }};
   window.ORG_OPTIONS = [{% for org in organisations %}{"id": {{ org.pk }}, "name": "{{ org.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
+  window.TIMELINE = {{ timeline_json|safe }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=2"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
+<script src="{% static 'js/item-drag.js' %}"></script>
 {% endblock %}

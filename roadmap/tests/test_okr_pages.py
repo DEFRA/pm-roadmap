@@ -124,7 +124,7 @@ class ObjectivePageTests(TestCase):
         obj = Objective.objects.get(title='Reduce wait times')
         self.assertEqual(obj.objective_set, self.set)
         self.assertEqual(obj.key_results.count(), 1)
-        self.assertEqual(res.url, reverse('roadmap:objective_set_detail', args=[self.set.pk]))
+        self.assertEqual(res.url, reverse('roadmap:objective_detail', args=[obj.pk]))
 
     def test_key_result_direction_validation(self):
         data = {
@@ -155,3 +155,35 @@ class ObjectivePageTests(TestCase):
         self.assertEqual(self.client.get(reverse('roadmap:objective_list')).status_code, 200)
         res = self.client.get(reverse('roadmap:objective_set_detail', args=[self.set.pk]))
         self.assertContains(res, 'Shown')
+
+    def test_objective_detail_is_read_only(self):
+        obj = Objective.objects.create(
+            objective_set=self.set, team=self.team,
+            title='Reduce wait times', description='faster licensing',
+        )
+        KeyResult.objects.create(
+            objective=obj, title='Median wait (days)', unit='days',
+            start_value=30, target_value=10, current_value=20,
+            status=KeyResult.ON_TRACK,
+        )
+        res = self.client.get(reverse('roadmap:objective_detail', args=[obj.pk]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'Objective: Reduce wait times')
+        self.assertContains(res, 'faster licensing')
+        self.assertContains(res, 'Median wait (days)')
+        self.assertContains(res, 'On track')
+        self.assertContains(res, reverse('roadmap:objective_edit', args=[obj.pk]))
+        self.assertNotContains(res, 'Save')
+        self.assertNotContains(res, 'name="title"')
+        self.assertIsNone(res.context['next_objective'])
+        self.assertIsNone(res.context['prev_objective'])
+
+    def test_objective_detail_next_prev_in_set(self):
+        first = Objective.objects.create(objective_set=self.set, team=self.team, title='First')
+        second = Objective.objects.create(objective_set=self.set, team=self.team, title='Second')
+        # Newest first (set-page order): second, then first.
+        res = self.client.get(reverse('roadmap:objective_detail', args=[second.pk]))
+        self.assertEqual(res.context['next_objective'], first)
+        self.assertEqual(res.context['prev_objective'], first)
+        self.assertContains(res, reverse('roadmap:objective_detail', args=[first.pk]))
+        self.assertContains(res, 'aria-label="Next objective"')

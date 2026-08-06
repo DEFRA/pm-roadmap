@@ -1,13 +1,13 @@
 {# One objective with its key results. Expects `objective`. #}
 <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
   <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:0.75rem;">
-    <div>
-      <div style="font-weight:600;">{{ objective.title }}</div>
+    <div style="min-width:0; flex:1;">
+      <div style="font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted);">Objective</div>
+      <a href="{% url 'roadmap:objective_detail' objective.pk %}" style="font-weight:600; text-decoration:none; color:inherit;">{{ objective.title }}</a>
+
       {% if objective.description %}
-        <div style="font-size:13px; color:var(--text-muted); margin-top:2px;">{{ objective.description }}</div>
-      {% endif %}
-      {% if objective.team %}
-        <span class="tag-pill" style="font-size:10px; margin-top:6px;">{{ objective.team.name }}</span>
+        <div style="font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:0.75rem;">Description</div>
+        <div style="font-size:13px; color:var(--text-muted); white-space:pre-wrap;">{{ objective.description }}</div>
       {% endif %}
     </div>
     <div style="display:flex; gap:6px; flex-shrink:0;">
@@ -20,13 +20,14 @@
     </div>
   </div>
 
+  <div style="font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:0.85rem; margin-bottom:0.4rem;">Key Results</div>
   {% if objective.key_results.all %}
-    <div style="margin-top:0.75rem; display:flex; flex-direction:column; gap:6px;">
+    <div style="display:flex; flex-direction:column;">
       {% for kr in objective.key_results.all %}
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px;">
+        <div{% if not forloop.first %} style="border-top:1px solid var(--border-subtle); margin-top:0.75rem; padding-top:0.75rem;"{% endif %}>
+          <div style="display:flex; justify-content:space-between; font-size:12px; gap:0.75rem;">
             <span>{{ kr.title }}</span>
-            <span style="color:var(--text-muted);">
+            <span style="color:var(--text-muted); white-space:nowrap;">
               {{ kr.current_value|floatformat:"-2" }} / {{ kr.target_value|floatformat:"-2" }}{{ kr.unit }}
               &middot; {{ kr.get_status_display }}
             </span>
@@ -38,6 +39,6 @@
       {% endfor %}
     </div>
   {% else %}
-    <div style="font-size:12px; color:var(--text-muted); margin-top:0.5rem;">No key results yet.</div>
+    <div style="font-size:12px; color:var(--text-muted);">No key results yet.</div>
   {% endif %}
 </div>

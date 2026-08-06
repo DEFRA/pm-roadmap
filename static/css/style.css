@@ -349,6 +349,13 @@ nav {
 /* While dragging, lock the cursor and stop text selection everywhere. */
 body.gantt-reordering { user-select: none; }
 body.gantt-reordering * { cursor: grabbing !important; }
+body.gantt-item-dragging { user-select: none; cursor: grabbing !important; }
+body.gantt-item-dragging * { cursor: grabbing !important; }
+body.gantt-item-resizing { user-select: none; cursor: ew-resize !important; }
+body.gantt-item-resizing * { cursor: ew-resize !important; }
+.gantt-bar--dragging { cursor: grabbing; }
+.gantt-drag-ghost { box-shadow: 0 8px 18px rgba(0,0,0,0.18); opacity: 0.92; }
+.gantt-drop-ok { outline: 2px dashed var(--accent-gold); outline-offset: -2px; background: rgba(128, 22, 80, 0.04); }
 
 .gantt-lane-tracks {
   border-bottom: 1px solid var(--border-subtle);
@@ -401,11 +408,18 @@ body.gantt-reordering * { cursor: grabbing !important; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
+  cursor: grab;
   transition: filter 0.15s, transform 0.1s;
   z-index: 2;
 }
 .gantt-bar:hover { filter: brightness(1.15); transform: scaleY(1.05); }
+.gantt-bar--resize-edge,
+.gantt-bar--resizing {
+  cursor: ew-resize;
+  transform: none;
+  filter: none;
+}
+.gantt-bar--resizing { z-index: 5; }
 
 /* Bar label truncates with an ellipsis when the title is wider than the bar.
    min-width:0 lets this flex child shrink below its content width so that
@@ -433,7 +447,7 @@ body.gantt-reordering * { cursor: grabbing !important; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  cursor: pointer;
+  cursor: grab;
   z-index: 3;
   /* center the icon on the date point */
   transform: translateX(-50%);
@@ -604,6 +618,8 @@ body.gantt-reordering * { cursor: grabbing !important; }
   color: #fff;
 }
 
+[x-cloak] { display: none !important; }
+
 .modal-tag-pill {
   display: inline-flex;
   align-items: center;
@@ -618,6 +634,7 @@ body.gantt-reordering * { cursor: grabbing !important; }
   transition: all 0.15s ease;
 }
 .modal-tag-pill:hover { opacity: 0.85; }
+.modal-tag-pill--selected { color: #fff; }
 
 .modal-org-option {
   display: inline-flex;
