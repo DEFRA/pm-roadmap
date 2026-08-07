@@ -1,6 +1,8 @@
 /* Drag items on the gantt: along the timeline (dates), between rows, and in/out
- * of the parking lot. Activity bars can also be resized from either end.
- * Drops outside the item's swimlane + track are ignored.
+ * of the parking lot. Activity bars can also be resized from either end. Key
+ * result bars (data-kr-id) drag/resize the same way but persist to the
+ * key-results endpoint and never park (they belong to a planning period).
+ * Drops outside the bar's swimlane + track are ignored.
  *
  * Touch/mobile is intentionally not handled yet (same as lane reorder).
  */
@@ -80,7 +82,8 @@
   }
 
   function resizeEdge(el, clientX) {
-    if (!el.classList.contains('gantt-bar--activity')) return null;
+    // Activities and key results can be resized from either end.
+    if (!el.classList.contains('gantt-bar--activity') && !el.classList.contains('gantt-bar--kr')) return null;
     if (el.dataset.parked === '1') return null;
     const zone = el.closest('[data-zone]');
     if (!zone || zone.dataset.zone !== 'track') return null;
@@ -107,8 +110,11 @@
       suppressClick = false;
     }, true);
 
-    async function persist(itemId, payload) {
-      const res = await fetch(`/api/items/${itemId}/`, {
+    async function persist(state, payload) {
+      const url = state.kind === 'kr'
+        ? `/api/key-results/${state.entityId}/`
+        : `/api/items/${state.entityId}/`;
+      const res = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
         body: JSON.stringify(payload),
@@ -119,7 +125,7 @@
     gantt.addEventListener('pointermove', (e) => {
       if (drag) return;
       gantt.querySelectorAll('.gantt-bar--resize-edge').forEach((b) => b.classList.remove('gantt-bar--resize-edge'));
-      const el = e.target.closest('.gantt-bar--activity.gantt-bar--draggable');
+      const el = e.target.closest('.gantt-bar--draggable');
       if (!el) return;
       if (resizeEdge(el, e.clientX)) el.classList.add('gantt-bar--resize-edge');
     });
@@ -208,7 +214,7 @@
           if (!start || !end) return;
           const startIso = dateToIso(start);
           const endIso = dateToIso(end < start ? start : end);
-          await persist(state.itemId, { start_date: startIso, end_date: endIso });
+          await persist(state, { start_date: startIso, end_date: endIso });
           window.location.reload();
           return;
         }
@@ -246,11 +252,11 @@
           }
         }
 
-        await persist(state.itemId, payload);
+        await persist(state, payload);
         window.location.reload();
       } catch (err) {
-        console.error('Failed to move item:', err);
-        alert('Could not update item.');
+        console.error('Failed to move bar:', err);
+        alert('Could not update.');
         state.el.style.left = `${state.leftPct}%`;
         state.el.style.width = `${state.widthPct}%`;
       }
@@ -259,11 +265,12 @@
     gantt.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       if (e.target.closest('.gantt-lane__handle')) return;
-      const el = e.target.closest('[data-item-id].gantt-bar--draggable');
+      const el = e.target.closest('[data-item-id].gantt-bar--draggable, [data-kr-id].gantt-bar--draggable');
       if (!el) return;
       const zone = el.closest('[data-zone][data-lane-key][data-track]');
       if (!zone) return;
 
+      const isKr = el.dataset.krId != null;
       const startIso = el.dataset.start || '';
       const endIso = el.dataset.end || '';
       const start = isoToDate(startIso);
@@ -273,8 +280,9 @@
       drag = {
         el,
         mode: edge ? `resize-${edge}` : 'move',
-        itemId: el.dataset.itemId,
-        itemType: el.dataset.itemType,
+        kind: isKr ? 'kr' : 'item',
+        entityId: isKr ? el.dataset.krId : el.dataset.itemId,
+        itemType: isKr ? 'metric' : el.dataset.itemType,   // KR bars live in the metrics track
         laneKey: zone.dataset.laneKey,
         track: zone.dataset.track,
         homeTrack: zone.dataset.zone === 'track' ? zone : null,

@@ -18,6 +18,7 @@ urlpatterns = [
     path('objectives/<int:pk>/edit/', views_okr.objective_edit, name='objective_edit'),
     path('objectives/<int:pk>/delete/', views_okr.objective_delete, name='objective_delete'),
     path('objectives/sets/<int:pk>/', views_okr.objective_set_detail, name='objective_set_detail'),
+    path('key-results/<int:pk>/snap-to-set/', views_okr.key_result_snap_to_set, name='key_result_snap'),
     path('objectives/sets/<int:pk>/edit/', views_okr.objective_set_edit, name='objective_set_edit'),
     path('objectives/sets/<int:pk>/delete/', views_okr.objective_set_delete, name='objective_set_delete'),
     path('objectives/sets/<int:pk>/archive/', views_okr.objective_set_archive, name='objective_set_archive'),
@@ -42,4 +43,5 @@ urlpatterns = [
     path('api/roadmaps/<int:pk>/', api.roadmap_detail, name='api_roadmap'),
     path('api/roadmaps/<int:roadmap_pk>/items/', api.items_collection, name='api_items'),
     path('api/items/<int:pk>/', api.item_detail, name='api_item'),
+    path('api/key-results/<int:pk>/', api.key_result_detail, name='api_key_result'),
 ]

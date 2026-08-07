@@ -395,6 +395,43 @@ def item_detail(request, pk):
     return JsonResponse(item_to_dict(item))
 
 
+def _apply_kr_fields(kr, data):
+    if 'start_date' in data:
+        kr.start_date = _parse_date(data['start_date'])   # '' or invalid → None (inherit set)
+    if 'end_date' in data:
+        kr.end_date = _parse_date(data['end_date'])
+    if 'row' in data:
+        row = data['row']
+        kr.row = None if row in (None, '') else max(0, int(row))
+
+
+def key_result_dict(kr):
+    return {
+        'id': kr.pk,
+        'objective': kr.objective_id,
+        'title': kr.title,
+        'start_date': kr.start_date.isoformat() if kr.start_date else '',
+        'end_date': kr.end_date.isoformat() if kr.end_date else '',
+        'row': kr.row,
+    }
+
+
+@require_http_methods(['PUT'])
+def key_result_detail(request, pk):
+    """Update a key result's timeline placement (dragged/resized on the roadmap):
+    start_date / end_date (empty clears → inherit the set period) and row."""
+    kr = get_object_or_404(KeyResult, pk=pk)
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    try:
+        _apply_kr_fields(kr, data)
+    except (ValueError, TypeError) as exc:
+        return _error(str(exc))
+    kr.save()
+    return JsonResponse(key_result_dict(kr))
+
+
 @require_http_methods(['GET'])
 def health(request):
     return JsonResponse({"ok": True})

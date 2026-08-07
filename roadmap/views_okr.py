@@ -11,8 +11,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 
 from . import okr_periods
-from .models import Objective, ObjectiveSet
+from .models import Objective, ObjectiveSet, KeyResult
 from .forms import ObjectiveForm, ObjectiveSetForm, KeyResultFormSet, set_form_seed
+
+
+def _kr_misaligned(kr, obj_set):
+    """True if a key result has a custom roadmap date that falls outside its
+    set's window (i.e. it was dragged off the set period). Blank dates inherit
+    the set period and are never misaligned."""
+    if not (obj_set.start_date and obj_set.end_date):
+        return False
+    lo, hi = obj_set.start_date, obj_set.end_date
+    return any(d is not None and (d < lo or d > hi) for d in (kr.start_date, kr.end_date))
 
 
 def objective_list(request):
@@ -42,11 +52,29 @@ def objective_set_detail(request, pk):
         ),
         pk=pk,
     )
+    misaligned_krs = [
+        kr for o in obj_set.objectives.all()
+        for kr in o.key_results.all() if _kr_misaligned(kr, obj_set)
+    ]
     return render(request, 'roadmap/objective_set_detail.html', {
         'objective_set': obj_set,
         'objectives': obj_set.objectives.all(),
         'roadmaps': obj_set.roadmaps.all(),
+        'misaligned_krs': misaligned_krs,
     })
+
+
+@require_POST
+def key_result_snap_to_set(request, pk):
+    """Clear a key result's custom roadmap dates so it re-spans its set period."""
+    kr = get_object_or_404(KeyResult.objects.select_related('objective'), pk=pk)
+    kr.start_date = None
+    kr.end_date = None
+    kr.save(update_fields=['start_date', 'end_date'])
+    set_id = kr.objective.objective_set_id
+    if set_id:
+        return redirect('roadmap:objective_set_detail', pk=set_id)
+    return redirect('roadmap:objective_detail', pk=kr.objective_id)
 
 
 def _set_home_redirect(obj_set):

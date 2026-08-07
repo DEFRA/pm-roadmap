@@ -375,6 +375,15 @@ class KeyResult(models.Model):
     current_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default=INCREASE)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=ON_TRACK)
+    # Timeline placement on a roadmap. Blank = span the objective's set period
+    # (the default); set (e.g. by dragging on the roadmap) = a custom window,
+    # which may be "non-aligned" with the set and is flagged on the set page.
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    row = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Manual row in the key-results track (0 = top). Blank = auto-stack.',
+    )
     sort_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

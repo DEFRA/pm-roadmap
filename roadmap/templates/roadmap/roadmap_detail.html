@@ -252,9 +252,11 @@
             <div class="gantt-bar gantt-bar--metric gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
             {% else %}
-            {# Key result synced from an objective set — opens the read-only objective view #}
-            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
-                 title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · open objective"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
+            {# Key result — draggable/resizable on the timeline; a click still opens the objective view #}
+            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr gantt-bar--draggable"
+               data-kr-id="{{ bar.kr_id }}" data-start="{{ bar.kr_start_iso }}" data-end="{{ bar.kr_end_iso }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}"
+               style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
+               title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · drag to reschedule, click to open"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
             {% endif %}
           {% endfor %}
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}

@@ -622,20 +622,28 @@ def _build_swimlanes(items, tag_type, columns, total_v):
 
 
 class _KrSpan:
-    """Adapter that lends a key result the timeframe of its objective's set, so a
-    KeyResult (which has no dates of its own) can be placed on the timeline via
-    _item_to_bar — the key result bar spans the whole set period."""
-    def __init__(self, obj_set):
-        self.start_date = obj_set.start_date
-        self.end_date = obj_set.end_date
+    """Minimal date-range adapter so a key result can be placed via _item_to_bar."""
+    def __init__(self, start_date, end_date):
+        self.start_date = start_date
+        self.end_date = end_date
 
 
 def _kr_bar(kr, obj_set, columns, total_v):
-    bar = _item_to_bar(_KrSpan(obj_set), columns, total_v)
+    """A key result's timeline bar. Uses the KR's own dates when set (e.g. dragged
+    on the roadmap); otherwise spans its objective's set period (the default)."""
+    if kr.start_date and kr.end_date:
+        span = _KrSpan(kr.start_date, kr.end_date)
+    elif obj_set is not None:
+        span = _KrSpan(obj_set.start_date, obj_set.end_date)
+    else:
+        return None
+    bar = _item_to_bar(span, columns, total_v)
     if bar is None:
-        return None  # set has no timeframe — the key result can't be placed
+        return None  # no timeframe — the key result can't be placed
     return {'kr_title': kr.title, 'kr_id': kr.pk, 'kr_progress': kr.progress,
-            'kr_objective_id': kr.objective_id,
+            'kr_objective_id': kr.objective_id, 'kr_row': kr.row,
+            'kr_start_iso': span.start_date.isoformat() if span.start_date else '',
+            'kr_end_iso': span.end_date.isoformat() if span.end_date else '',
             'left_pct': bar['left_pct'], 'width_pct': bar['width_pct']}
 
 
@@ -774,11 +782,14 @@ def _serialise_items(lanes):
 
 
 def _apply_manual_rows(stacked, parking):
-    """Honour Item.row when set; return the resulting row_count."""
+    """Honour a manual row when set (Item.row for item bars, KeyResult.row for
+    key-result bars); return the resulting row_count."""
     for bar in stacked:
         item = bar.get('item')
         if item is not None and item.row is not None:
             bar['row'] = item.row
+        elif bar.get('kr_row') is not None:  # key-result bars have no item
+            bar['row'] = bar['kr_row']
     for entry in parking:
         if entry['item'].row is not None:
             entry['row'] = entry['item'].row
