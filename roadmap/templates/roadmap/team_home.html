@@ -31,12 +31,32 @@
         {% include "roadmap/_okr_period_line.html" with set=set %}
       </div>
       <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
-        {{ set.objectives.count }} Objective{{ set.objectives.count|pluralize }}
+        {{ set.durable_objective_count }} Objective{{ set.durable_objective_count|pluralize }}
       </div>
     </div>
   {% empty %}
     <p style="color:var(--text-muted);">No objective sets for this team yet.</p>
   {% endfor %}
+
+  {% if archived_sets %}
+    <details style="margin-top:0.75rem;">
+      <summary style="cursor:pointer; font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); list-style:none;">
+        <span style="font-weight:600;">Archived sets ({{ archived_sets|length }})</span>
+      </summary>
+      {% for set in archived_sets %}
+        <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem; opacity:0.75;">
+          <a href="{% url 'roadmap:objective_set_detail' set.pk %}" style="font-weight:600;">{{ set.name }}</a>
+          <span class="tag-pill" style="font-size:10px; border-color:var(--text-muted); color:var(--text-muted); margin-left:6px;">Archived</span>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
+            {% include "roadmap/_okr_period_line.html" with set=set %}
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">
+            {{ set.durable_objective_count }} Objective{{ set.durable_objective_count|pluralize }}
+          </div>
+        </div>
+      {% endfor %}
+    </details>
+  {% endif %}
 
   <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
     <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0;">Roadmaps</h2>
@@ -52,12 +72,5 @@
   {% empty %}
     <p style="color:var(--text-muted);">No roadmaps owned by this team yet.</p>
   {% endfor %}
-
-  {% if archived_sets %}
-    <h2 style="font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:1.5rem;">Archived sets</h2>
-    {% for set in archived_sets %}
-      <div style="font-size:13px; margin-top:4px;"><a href="{% url 'roadmap:objective_set_detail' set.pk %}">{{ set.name }}</a></div>
-    {% endfor %}
-  {% endif %}
 </div>
 {% endblock %}

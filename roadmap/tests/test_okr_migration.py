@@ -109,7 +109,7 @@ class SyncedKeyResultPlottingTests(TestCase):
             start_date='2026-07-01', end_date='2026-09-30',
         )
         self.obj = Objective.objects.create(objective_set=self.set, team=self.team, title='Speed up licensing')
-        self.kr = KeyResult.objects.create(objective=self.obj, title='Median wait (days)',
+        self.kr = KeyResult.objects.create(objective=self.obj, objective_set=self.set, title='Median wait (days)',
                                            start_value=45, target_value=20, current_value=30)
         # Team roadmap with OKR sync on — no items of its own.
         self.rm = Roadmap.objects.create(name='Licensing RM', roadmap_type=Roadmap.SERVICE,
@@ -143,7 +143,7 @@ class RoadmapObjectiveHeaderTests(TestCase):
             start_date='2026-07-01', end_date='2026-09-30',
         )
         self.obj = Objective.objects.create(objective_set=self.set, team=self.team, title='Speed up licensing')
-        self.kr = KeyResult.objects.create(objective=self.obj, title='Median wait (days)',
+        self.kr = KeyResult.objects.create(objective=self.obj, objective_set=self.set, title='Median wait (days)',
                                            start_value=45, target_value=20, current_value=30)
         self.rm = Roadmap.objects.create(name='Licensing RM', roadmap_type=Roadmap.SERVICE,
                                          owning_team=self.team, sync_okrs=True)

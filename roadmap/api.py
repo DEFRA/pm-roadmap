@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 
 from .models import Roadmap, Item, Tag, Organisation, Objective, KeyResult
+from . import access
 from .access import objective_assignable_to_roadmap
 
 
@@ -323,13 +324,24 @@ def _ensure_key_result(item, previous_title=None):
         return None
     lookup_title = previous_title or item.title
     kr = KeyResult.objects.filter(objective=objective, title=lookup_title).first()
+    # A roadmap-authored metric isn't tied to a planning period, so its key result
+    # carries the item's own dates (B2) — the KR bar sits exactly where the metric
+    # is on the timeline, rather than spanning a set it doesn't belong to.
     if kr is None:
         kr = KeyResult.objects.create(
             objective=objective, title=item.title, sort_order=_next_kr_sort_order(objective),
+            start_date=item.start_date, end_date=item.end_date,
         )
-    elif kr.title != item.title:
-        kr.title = item.title
-        kr.save(update_fields=['title'])
+    else:
+        updates = []
+        if kr.title != item.title:
+            kr.title = item.title
+            updates.append('title')
+        if (kr.start_date, kr.end_date) != (item.start_date, item.end_date):
+            kr.start_date, kr.end_date = item.start_date, item.end_date
+            updates += ['start_date', 'end_date']
+        if updates:
+            kr.save(update_fields=updates)
     return kr
 
 
@@ -430,6 +442,29 @@ def key_result_detail(request, pk):
         return _error(str(exc))
     kr.save()
     return JsonResponse(key_result_dict(kr))
+
+
+@require_http_methods(['PUT'])
+def roadmap_objectives_visibility(request, pk):
+    """Set which of the roadmap's objectives are hidden (deselected in the Manage
+    objectives panel). Body: {"hidden": [objId, ...]}. Everything not listed is
+    shown; an empty list shows all. Only objectives available to this roadmap can
+    be hidden — stray ids are ignored."""
+    roadmap = get_object_or_404(Roadmap, pk=pk)
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    hidden = data.get('hidden', [])
+    if not isinstance(hidden, list):
+        return _error('hidden must be a list of objective ids')
+    try:
+        requested = {int(i) for i in hidden}
+    except (ValueError, TypeError):
+        return _error('hidden must be a list of objective ids')
+    # Guard: only hide objectives that actually belong to this roadmap's team.
+    available = set(access.roadmap_objective_ids(roadmap)) | set(roadmap.hidden_objectives.values_list('pk', flat=True))
+    roadmap.hidden_objectives.set(requested & available)
+    return JsonResponse({'hidden': sorted(roadmap.hidden_objectives.values_list('pk', flat=True))})
 
 
 @require_http_methods(['GET'])

@@ -157,6 +157,10 @@ class Roadmap(models.Model):
     objective_sets = models.ManyToManyField('ObjectiveSet', blank=True, related_name='roadmaps')
     # Standalone objectives (not in a set) attached directly to this roadmap.
     objectives = models.ManyToManyField('Objective', blank=True, related_name='applied_roadmaps')
+    # Team objectives deselected on this roadmap (all show by default; this hides them).
+    hidden_objectives = models.ManyToManyField(
+        'Objective', blank=True, related_name='hidden_on_roadmaps',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -323,6 +327,9 @@ class Objective(models.Model):
 
     Ported from myproduct.pro without the user `owner` field.
     """
+    # DEPRECATED: objectives are now durable (owned by a team, reused across
+    # periods). Time-boxing lives on KeyResult.objective_set. Kept populated so
+    # group-roadmap sourcing keeps working until group objectives are made durable.
     objective_set = models.ForeignKey(
         'ObjectiveSet', on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives'
     )
@@ -367,6 +374,12 @@ class KeyResult(models.Model):
 
     objective = models.ForeignKey(
         'Objective', on_delete=models.CASCADE, related_name='key_results'
+    )
+    # The planning period this key result belongs to. A durable objective can
+    # carry KRs across several sets (quarters); each KR spans its own set's
+    # period on the timeline. Null = no period (spans only its own dates, if any).
+    objective_set = models.ForeignKey(
+        'ObjectiveSet', on_delete=models.SET_NULL, null=True, blank=True, related_name='key_results',
     )
     title = models.CharField(max_length=200)
     unit = models.CharField(max_length=20, blank=True, help_text='e.g. %, £, users')

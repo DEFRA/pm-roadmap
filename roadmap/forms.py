@@ -153,6 +153,16 @@ def set_form_seed(form):
 
 class ObjectiveForm(forms.ModelForm):
     # Team is not asked for — an objective inherits its set's team (set in the view).
+    # When authoring under a set, an existing team objective can be reused instead
+    # of creating a new one (durable objectives, B2) — its new key results attach
+    # to this set's period. Enabled by passing `team=` (create-under-a-set only).
+    existing_objective = forms.ModelChoiceField(
+        queryset=Objective.objects.none(), required=False,
+        widget=forms.Select(attrs={'class': 'form-input'}),
+        label='Reuse an existing objective',
+        empty_label='— create a new objective —',
+    )
+
     class Meta:
         model = Objective
         fields = ['objective_set', 'title', 'description']
@@ -162,12 +172,32 @@ class ObjectiveForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, team=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(archived=False)
         self.fields['objective_set'].required = False
         self.fields['objective_set'].label = 'Set'
         self.fields['objective_set'].empty_label = 'No set'
+        self.allow_reuse = team is not None
+        if self.allow_reuse:
+            qs = Objective.objects.filter(team=team).select_related('objective_set')
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            field = self.fields['existing_objective']
+            field.queryset = qs
+            # Show the objective's primary set in brackets so same-named objectives
+            # across quarters can be told apart, e.g. "obj 1 (2026 Q3)".
+            field.label_from_instance = lambda o: (
+                f'{o.title} ({o.objective_set.name})' if o.objective_set_id else o.title
+            )
+            self.fields['title'].required = False  # optional: pick existing OR name a new one
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.allow_reuse and not cleaned.get('existing_objective') \
+                and not (cleaned.get('title') or '').strip():
+            self.add_error('title', 'Enter a title, or pick an existing objective to reuse.')
+        return cleaned
 
 
 class KeyResultForm(forms.ModelForm):

@@ -165,6 +165,35 @@ function roadmapApp() {
       } catch (e) { alert('Failed to save tags: ' + e.message); }
     },
 
+    // ── manage which objectives show as swim lanes (B2 visibility tickbox) ──
+    // Each entry is {id, title, shown}; shown=false hides the lane on this roadmap.
+    manageObjectives: (window.MANAGE_OBJECTIVES || []).map((o) => ({
+      id: o.id, title: o.title, shown: !o.hidden,
+    })),
+    showObjPanel: false,
+    objSaving: false,
+    openObjPanel() {
+      // Re-seed from the server state each time the panel opens.
+      this.manageObjectives = (window.MANAGE_OBJECTIVES || []).map((o) => ({
+        id: o.id, title: o.title, shown: !o.hidden,
+      }));
+      this.showObjPanel = true;
+    },
+    closeObjPanel() { this.showObjPanel = false; },
+    objSelectAll() { this.manageObjectives.forEach((o) => { o.shown = true; }); },
+    objDeselectAll() { this.manageObjectives.forEach((o) => { o.shown = false; }); },
+    async saveObjectiveVisibility() {
+      this.objSaving = true;
+      const hidden = this.manageObjectives.filter((o) => !o.shown).map((o) => o.id);
+      try {
+        await apiFetch(`/api/roadmaps/${this.roadmap.id}/objectives-visibility/`, 'PUT', { hidden });
+        window.location.reload();
+      } catch (e) {
+        this.objSaving = false;
+        alert('Failed to save: ' + e.message);
+      }
+    },
+
     // ── item create / edit modal ──
     showItemForm: false,
     itemForm: blankItemForm(),

@@ -122,9 +122,18 @@ class SyncScopingTests(TestCase):
         self.assertIn(self.group_obj.pk, ids)
         self.assertNotIn(self.team_obj.pk, ids)
 
-    def test_archived_set_does_not_sync(self):
+    def test_archived_set_still_shows_durable_objective(self):
+        # Durable objectives (B2): the objective is owned by the team and persists
+        # across quarters, so archiving one of its periods no longer removes the
+        # objective from the team roadmap. (Its KRs in that archived set stop
+        # plotting — that's handled in the lane builder, not here.)
         self.team_set.archived = True
         self.team_set.save(update_fields=['archived'])
+        self.assertIn(self.team_obj.pk, access.roadmap_objective_ids(self.team_roadmap))
+
+    def test_hidden_objective_absent_from_team_roadmap(self):
+        # Deselecting an objective on a roadmap hides just that objective.
+        self.team_roadmap.hidden_objectives.add(self.team_obj)
         self.assertNotIn(self.team_obj.pk, access.roadmap_objective_ids(self.team_roadmap))
 
     def test_sync_off_hides_synced_but_keeps_direct(self):

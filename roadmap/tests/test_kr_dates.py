@@ -75,13 +75,13 @@ class KrWarningAndSnapTests(TestCase):
         self.obj = Objective.objects.create(objective_set=self.set, team=self.team, title='Speed up')
 
     def test_aligned_kr_not_flagged(self):
-        KeyResult.objects.create(objective=self.obj, title='In window',
+        KeyResult.objects.create(objective=self.obj, objective_set=self.set, title='In window',
                                  start_date=date(2026, 7, 15), end_date=date(2026, 8, 15))
         res = self.client.get(f'/objectives/sets/{self.set.pk}/')
         self.assertEqual(res.context['misaligned_krs'], [])
 
     def test_misaligned_kr_flagged_and_snap_clears_it(self):
-        kr = KeyResult.objects.create(objective=self.obj, title='Drifted',
+        kr = KeyResult.objects.create(objective=self.obj, objective_set=self.set, title='Drifted',
                                       start_date=date(2026, 10, 1), end_date=date(2026, 11, 30))
         res = self.client.get(f'/objectives/sets/{self.set.pk}/')
         self.assertIn(kr, res.context['misaligned_krs'])
