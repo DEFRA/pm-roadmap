@@ -1,0 +1,20 @@
+{% comment %}One activity node with its milestones. Expects `a` = {activity, milestones}.{% endcomment %}
+<li>
+  <span class="tnode" style="--accent:#1d70b8;">
+    <span class="tnode__kicker">Activity</span>
+    <span class="tnode__title">{{ a.activity.title }}</span>
+  </span>
+  {% if a.milestones %}
+    <ul class="tree__children">
+      {% for m in a.milestones %}
+        <li>
+          <span class="tnode" style="--accent:#f47738;">
+            <span class="tnode__kicker">Milestone</span>
+            <span class="tnode__title">{{ m.title }}</span>
+            {% if m.start_date %}<span class="tnode__meta">{{ m.start_date|date:"d M Y" }}</span>{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</li>

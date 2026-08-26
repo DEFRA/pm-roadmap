@@ -362,6 +362,24 @@
         </div>
       </div>
 
+      {# Key results the activity relates to — revealed once an objective is picked #}
+      <div class="modal-card__section" x-show="itemForm.item_type === 'activity' && itemForm.objective" x-cloak>
+        <label class="modal-card__section-label">Key results this activity contributes to</label>
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+          <template x-for="kr in objectiveKeyResults()" :key="kr.id">
+            <button type="button" class="modal-tag-pill"
+                    @click="toggleItemKeyResult(kr.id)"
+                    :class="itemForm.key_results.includes(kr.id) ? 'modal-tag-pill--selected' : ''"
+                    :style="itemForm.key_results.includes(kr.id)
+                      ? 'background:#00703c; border-color:#00703c; color:#fff;'
+                      : 'border-color:#00703c; color:#00703c'">
+              <span x-text="kr.title"></span>
+            </button>
+          </template>
+          <span x-show="!objectiveKeyResults().length" style="font-size:12px; color:var(--text-muted);">This objective has no key results yet.</span>
+        </div>
+      </div>
+
       <template x-for="section in [
           {type: 'organisation', label: 'Squads', creatable: true},
           {type: 'category', label: 'Item Categories', creatable: true}
@@ -391,19 +409,21 @@
         </div>
       </template>
 
-      {# Linked activities (for milestones/metrics) #}
-      <template x-if="itemForm.item_type !== 'activity' && activities.length">
+      {# Linked activities (for milestones/metrics) — the activities this item relates to #}
+      <template x-if="itemForm.item_type !== 'activity'">
         <div class="modal-card__section">
-          <label class="modal-card__section-label">Linked Activities</label>
+          <label class="modal-card__section-label">Linked activities</label>
+          <br>
           <div style="display:flex; flex-wrap:wrap; gap:10px;">
             <template x-for="act in activities" :key="act.id">
               <button type="button" class="modal-tag-pill"
                       @click="itemForm.linked_activities.includes(act.id) ? itemForm.linked_activities.splice(itemForm.linked_activities.indexOf(act.id),1) : itemForm.linked_activities.push(act.id)"
                       :class="itemForm.linked_activities.includes(act.id) ? 'modal-tag-pill--selected' : ''"
-                      :style="itemForm.linked_activities.includes(act.id) ? 'background:#555; border-color:#555; color:#fff;' : 'border-color:#999; color:#555;'">
+                      :style="itemForm.linked_activities.includes(act.id) ? 'background:#1d70b8; border-color:#1d70b8; color:#fff;' : 'border-color:#1d70b8; color:#1d70b8;'">
                 <span x-text="act.title"></span>
               </button>
             </template>
+            <span x-show="!activities.length" style="font-size:12px; color:var(--text-muted);">No activities on this roadmap yet — add an activity first, then link it here.</span>
           </div>
         </div>
       </template>

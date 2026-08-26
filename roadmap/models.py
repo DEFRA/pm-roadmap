@@ -235,6 +235,12 @@ class Item(models.Model):
         limit_choices_to={'item_type': ACTIVITY},
     )
 
+    # Activities can relate directly to the key results they contribute to. The
+    # key results must belong to the item's objective (enforced in the API).
+    key_results = models.ManyToManyField(
+        'KeyResult', blank=True, related_name='activities',
+    )
+
     class Meta:
         ordering = ['start_date', 'title']
 

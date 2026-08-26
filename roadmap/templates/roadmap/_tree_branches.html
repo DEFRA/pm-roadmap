@@ -1,0 +1,44 @@
+{% comment %}The branches under an outcome. Expects `bucket` with `objectives`
+(each {objective, key_results:[{kr, activities:[{activity, milestones}]}]}) and
+`activities` (unassigned {activity, milestones}), plus `empty_label`.{% endcomment %}
+{% if bucket.objectives or bucket.activities %}
+  <ul class="tree__children">
+    {% for o in bucket.objectives %}
+      <li>
+        <a class="tnode" style="--accent:#d53880;" href="{% url 'roadmap:objective_detail' o.objective.pk %}">
+          <span class="tnode__kicker">Objective</span>
+          <span class="tnode__title">{{ o.objective.title }}</span>
+        </a>
+        <ul class="tree__children">
+          {% for k in o.key_results %}
+            <li>
+              <span class="tnode" style="--accent:#00703c;">
+                <span class="tnode__kicker">Key result</span>
+                <span class="tnode__title">{{ k.kr.title }}</span>
+                <span class="tnode__meta">
+                  {{ k.kr.current_value|floatformat:"-2" }} / {{ k.kr.target_value|floatformat:"-2" }}{{ k.kr.unit }}
+                  &middot; {{ k.kr.get_status_display }}
+                  {% if k.kr.objective_set %}<span class="tpill">{{ k.kr.objective_set.name }}</span>{% endif %}
+                </span>
+                <span class="tkr-bar"><span style="width:{{ k.kr.progress }}%;"></span></span>
+              </span>
+              {% if k.activities %}
+                <ul class="tree__children">
+                  {% for a in k.activities %}{% include "roadmap/_tree_activity.html" with a=a %}{% endfor %}
+                </ul>
+              {% endif %}
+            </li>
+          {% empty %}
+            <li><span class="tnode tnode--empty"><span class="tnode__title">No key results yet</span></span></li>
+          {% endfor %}
+        </ul>
+      </li>
+    {% endfor %}
+
+    {% for a in bucket.activities %}{% include "roadmap/_tree_activity.html" with a=a %}{% endfor %}
+  </ul>
+{% else %}
+  <ul class="tree__children"><li>
+    <span class="tnode tnode--empty"><span class="tnode__title">{{ empty_label|default:"Nothing linked yet" }}</span></span>
+  </li></ul>
+{% endif %}

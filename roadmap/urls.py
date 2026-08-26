@@ -32,6 +32,7 @@ urlpatterns = [
     path('teams/<int:pk>/sets/new/', views_team.team_set_create, name='team_set_create'),
     path('teams/<int:pk>/roadmaps/new/', views_team.team_roadmap_create, name='team_roadmap_create'),
 
+    path('<int:pk>/tree/', views.roadmap_tree, name='tree'),
     path('<int:pk>/', views.roadmap_detail, name='detail'),
 
     # ── JSON API (backs the in-page modals) ──

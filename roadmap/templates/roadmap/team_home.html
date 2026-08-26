@@ -72,5 +72,19 @@
   {% empty %}
     <p style="color:var(--text-muted);">No roadmaps owned by this team yet.</p>
   {% endfor %}
+
+  {% if team_roadmaps %}
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
+      <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0;">Initiative trees</h2>
+    </div>
+    <p style="font-size:12px; color:var(--text-muted); margin:0.25rem 0 0;">
+      Visualise a roadmap's initiatives as a tree: Defra outcome &rsaquo; activities &rsaquo; objectives &rsaquo; key results.
+    </p>
+    {% for rm in team_roadmaps %}
+      <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem;">
+        <a href="{% url 'roadmap:tree' rm.pk %}" style="font-weight:600;">{{ rm.name }}</a>
+      </div>
+    {% endfor %}
+  {% endif %}
 </div>
 {% endblock %}

@@ -36,6 +36,132 @@ def roadmap_list(request):
     })
 
 
+def roadmap_tree(request, pk):
+    """A tree-style infographic of a roadmap's initiatives. Under each Defra
+    outcome the branches ladder up to it:
+      • Objective → its Key results → the Activities assigned to each key result
+        → each activity's Milestones
+      • Activities not assigned to any key result hang directly off the outcome
+        (still with their milestones).
+    An activity is "assigned to a key result" via its direct key_results link
+    (set in the roadmap item modal). Outcomes with nothing linked still appear;
+    activities with no outcome collect under a placeholder."""
+    from collections import OrderedDict
+
+    roadmap = get_object_or_404(Roadmap, pk=pk)
+    activities = list(
+        roadmap.items.filter(item_type=Item.ACTIVITY)
+        .prefetch_related(
+            'tags', 'objective__key_results__objective_set', 'linked_milestones_metrics',
+            'key_results',
+        )
+        .order_by('title', 'pk')
+    )
+
+    def _new_bucket():
+        # `_objectives` is a pk-keyed dict while building (dedupes objectives that
+        # several activities share); finalised into the `objectives` list below.
+        return {'activities': [], '_objectives': OrderedDict(), '_entries': []}
+
+    def _activity_entry(act):
+        milestones = sorted(
+            (m for m in act.linked_milestones_metrics.all() if m.item_type == Item.MILESTONE),
+            key=lambda m: (m.start_date or date.max, m.title),
+        )
+        return {'activity': act, 'milestones': milestones,
+                '_kr_pks': {kr.pk for kr in act.key_results.all()}}
+
+    def _add_objective(bucket, obj):
+        if obj is not None and obj.pk not in bucket['_objectives']:
+            bucket['_objectives'][obj.pk] = {
+                'objective': obj, 'key_results': list(obj.key_results.all()),
+            }
+
+    # Seed every outcome assigned to the roadmap so empty ones still show.
+    outcome_nodes = OrderedDict(
+        (tag.pk, {'outcome': tag, **_new_bucket()})
+        for tag in roadmap.tags.all() if tag.tag_type == Tag.OUTCOME
+    )
+    no_outcome = _new_bucket()
+
+    for act in activities:
+        outs = [t for t in act.tags.all() if t.tag_type == Tag.OUTCOME]
+        entry = _activity_entry(act)
+        targets = ([no_outcome] if not outs else
+                   [outcome_nodes.setdefault(t.pk, {'outcome': t, **_new_bucket()}) for t in outs])
+        for bucket in targets:
+            bucket['_entries'].append(entry)
+            _add_objective(bucket, act.objective)
+
+    def _finalise(bucket):
+        entries = bucket.pop('_entries')
+        objectives = sorted(
+            bucket.pop('_objectives').values(), key=lambda o: o['objective'].title.lower())
+        assigned = set()
+        for o in objectives:
+            krs = []
+            for kr in o['key_results']:
+                kr_acts = [e for e in entries if kr.pk in e['_kr_pks']]
+                assigned.update(e['activity'].pk for e in kr_acts)
+                krs.append({'kr': kr, 'activities': kr_acts})
+            o['key_results'] = krs
+        bucket['objectives'] = objectives
+        # Fallback branch: activities not assigned to any displayed key result.
+        bucket['activities'] = [e for e in entries if e['activity'].pk not in assigned]
+    for node in outcome_nodes.values():
+        _finalise(node)
+    _finalise(no_outcome)
+
+    outcome_tree = sorted(outcome_nodes.values(), key=lambda n: n['outcome'].name.lower())
+
+    # The picker lets you view one outcome's tree at a time (?outcome=<pk>), all of
+    # them (default), or just the activities with no outcome (?outcome=none).
+    selected = request.GET.get('outcome') or 'all'
+    if selected == 'none':
+        display_tree, display_no_outcome = [], no_outcome
+    elif selected.isdigit() and int(selected) in outcome_nodes:
+        display_tree, display_no_outcome = [outcome_nodes[int(selected)]], None
+    else:
+        selected = 'all'
+        display_tree, display_no_outcome = outcome_tree, no_outcome
+
+    # Totals reflect what is currently on screen so they stay coherent per outcome.
+    shown = list(display_tree) + ([display_no_outcome] if display_no_outcome else [])
+    act_ids, obj_ids, kr_ids, ms_ids = set(), set(), set(), set()
+
+    def _count_activity(a):
+        act_ids.add(a['activity'].pk)
+        ms_ids.update(m.pk for m in a['milestones'])
+
+    for bucket in shown:
+        for a in bucket['activities']:          # fallback (unassigned) activities
+            _count_activity(a)
+        for o in bucket['objectives']:
+            obj_ids.add(o['objective'].pk)
+            for k in o['key_results']:
+                kr_ids.add(k['kr'].pk)
+                for a in k['activities']:       # activities nested under a key result
+                    _count_activity(a)
+
+    has_no_outcome = bool(no_outcome['activities'] or no_outcome['objectives'])
+    return render(request, 'roadmap/roadmap_tree.html', {
+        'roadmap': roadmap,
+        'team': roadmap.owning_team,
+        'outcome_tree': display_tree,
+        'no_outcome': display_no_outcome,
+        'outcome_options': outcome_tree,      # every outcome, for the picker
+        'has_no_outcome': has_no_outcome,     # whether to offer the "No outcome" option
+        'selected': selected,
+        'totals': {
+            'outcomes': len(display_tree),
+            'objectives': len(obj_ids),
+            'key_results': len(kr_ids),
+            'activities': len(act_ids),
+            'milestones': len(ms_ids),
+        },
+    })
+
+
 @ensure_csrf_cookie
 def roadmap_detail(request, pk):
     roadmap = get_object_or_404(Roadmap, pk=pk)
@@ -274,6 +400,8 @@ def roadmap_detail(request, pk):
                 'id': o.pk,
                 'title': o.title,
                 'set_name': o.objective_set.name if o.objective_set_id else '',
+                # The objective's key results, for the item modal's KR picker.
+                'key_results': [{'id': kr.pk, 'title': kr.title} for kr in o.key_results.all()],
             }
             for o in modal_objectives
         ]),

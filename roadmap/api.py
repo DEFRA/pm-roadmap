@@ -51,6 +51,7 @@ def item_to_dict(i):
         'objective': i.objective_id,
         'tags': [tag_to_dict(t) for t in i.tags.all()],
         'linked_activities': [{'id': a.pk, 'title': a.title} for a in i.linked_activities.all()],
+        'key_results': [{'id': kr.pk, 'title': kr.title} for kr in i.key_results.all()],
     }
 
 
@@ -307,6 +308,20 @@ def _apply_item_fields(item, data):
             item.objective = objective
 
 
+def _reconcile_key_results(item, data):
+    """Set the activity's related key results, keeping only those that belong to
+    its objective. Runs on every save so changing the objective drops key results
+    that no longer apply, even when the client doesn't resend the selection."""
+    if 'key_results' in data:
+        ids = {int(i) for i in (data['key_results'] or [])}
+    else:
+        ids = set(item.key_results.values_list('pk', flat=True))
+    if item.objective_id and ids:
+        item.key_results.set(KeyResult.objects.filter(objective_id=item.objective_id, pk__in=ids))
+    else:
+        item.key_results.clear()
+
+
 def _next_kr_sort_order(objective):
     last = objective.key_results.order_by('-sort_order').first()
     return (last.sort_order + 1) if last else 0
@@ -370,6 +385,7 @@ def items_collection(request, roadmap_pk):
     _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    _reconcile_key_results(item, data)
     # A metric assigned to an objective is a key result — back it with one.
     if item.item_type == Item.METRIC and item.objective_id:
         _ensure_key_result(item)
@@ -401,6 +417,7 @@ def item_detail(request, pk):
         _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    _reconcile_key_results(item, data)
     # Keep the backing key result in step with a metric on an objective.
     if item.item_type == Item.METRIC and item.objective_id:
         _ensure_key_result(item, previous_title=previous_title)
