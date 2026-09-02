@@ -69,6 +69,36 @@
     return Math.max(0, Math.round(y / (rowH + ROW_GAP)));
   }
 
+  // Two bars overlap when their date spans (left%..left+width%) intersect.
+  function spansOverlap(l1, w1, l2, w2) {
+    return l1 < l2 + w2 && l2 < l1 + w1;
+  }
+
+  // The row a bar should land on: the caller's target row if its date span is
+  // free there, otherwise the NEAREST free row — checking upward before downward
+  // at each distance, so an empty line above (e.g. an empty top row) is easy to
+  // drop onto rather than skipping past it to a new line below. Guarantees a
+  // dropped bar never overlaps another. `excludeEl` is the bar being dragged.
+  function freeRow(zone, excludeEl, leftPct, widthPct, targetRow) {
+    const occupied = {};
+    zone.querySelectorAll('.gantt-bar, .gantt-milestone-marker').forEach((b) => {
+      if (b === excludeEl || b.dataset.parked === '1' || b.dataset.left == null) return;
+      const r = parseInt(b.dataset.row || '0', 10);
+      (occupied[r] = occupied[r] || []).push([
+        parseFloat(b.dataset.left || '0'), parseFloat(b.dataset.width || '0'),
+      ]);
+    });
+    const isFree = (r) =>
+      r >= 0 && !(occupied[r] || []).some(([l, w]) => spansOverlap(leftPct, widthPct, l, w));
+    const target = Math.max(0, targetRow);
+    if (isFree(target)) return target;
+    for (let d = 1; d < 500; d += 1) {
+      if (isFree(target - d)) return target - d;   // prefer an empty line above
+      if (isFree(target + d)) return target + d;
+    }
+    return target;
+  }
+
   function findZone(x, y, laneKey, track, allowParking) {
     const els = document.elementsFromPoint(x, y);
     for (const el of els) {
@@ -221,10 +251,11 @@
 
         if (!state.zone) return;
         const zone = state.zone;
-        const row = rowFromY(zone, e.clientY, state.itemType);
-        const payload = { row };
+        const targetRow = rowFromY(zone, e.clientY, state.itemType);
+        const payload = {};
 
         if (zone.dataset.zone === 'parking') {
+          payload.row = targetRow;
           payload.start_date = '';
           payload.end_date = '';
         } else {
@@ -250,6 +281,8 @@
             payload.start_date = dateToIso(start);
             payload.end_date = dateToIso(addDays(start, state.durationDays));
           }
+          // Never overlap another bar on the same row — drop onto the next free line.
+          payload.row = freeRow(zone, state.el, leftPct, widthPct, targetRow);
         }
 
         await persist(state, payload);
