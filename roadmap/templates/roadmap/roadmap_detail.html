@@ -87,6 +87,21 @@
                 <span style="font-size:12px; color:var(--text-muted);">None yet</span>
               {% endfor %}
             {% endif %}
+            {% if can_manage_objectives %}
+              {# Create a new objective right here — appears as a lane straight away #}
+              <button type="button" class="tag-pill tag-pill--clickable no-export" x-show="!showNewObjective"
+                      style="border-style:dashed; border-color:var(--accent-gold); color:var(--accent-gold);"
+                      @click="showNewObjective = true" title="Create a new objective">+ New objective</button>
+              <span x-show="showNewObjective" x-cloak style="display:inline-flex; gap:4px; align-items:center;">
+                <input type="text" x-model="newObjectiveTitle" @keydown.enter.prevent="createObjective()"
+                       @keydown.escape="showNewObjective = false"
+                       placeholder="Objective title…" class="form-input" style="font-size:12px; padding:2px 8px; width:180px;">
+                <button type="button" class="btn btn-primary" style="font-size:11px; padding:3px 9px;"
+                        :disabled="objCreating" @click="createObjective()" x-text="objCreating ? '…' : 'Add'"></button>
+                <button type="button" class="btn btn-ghost" style="font-size:11px; padding:3px 7px;"
+                        @click="showNewObjective = false; newObjectiveTitle = ''" title="Cancel">&times;</button>
+              </span>
+            {% endif %}
           </div>
         </div>
 
@@ -393,7 +408,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=3"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=5"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>

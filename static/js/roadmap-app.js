@@ -193,6 +193,23 @@ function roadmapApp() {
         alert('Failed to save: ' + e.message);
       }
     },
+    // Create a new objective straight from the roadmap (durable: team-owned, no
+    // set — key results carry the period and are added by opening the objective).
+    newObjectiveTitle: '',
+    objCreating: false,
+    showNewObjective: false,
+    async createObjective() {
+      const title = (this.newObjectiveTitle || '').trim();
+      if (!title) { alert('Enter an objective title'); return; }
+      this.objCreating = true;
+      try {
+        await apiFetch('/api/objectives/', 'POST', { title, roadmap: this.roadmap.id });
+        window.location.reload();
+      } catch (e) {
+        this.objCreating = false;
+        alert('Failed to add objective: ' + e.message);
+      }
+    },
 
     // ── item create / edit modal ──
     showItemForm: false,

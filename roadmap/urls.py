@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/tags/<int:pk>/', api.tag_detail, name='api_tag'),
     path('api/roadmaps/', api.roadmaps_collection, name='api_roadmaps'),
     path('api/roadmaps/<int:pk>/', api.roadmap_detail, name='api_roadmap'),
+    path('api/objectives/', api.objectives_collection, name='api_objectives'),
     path('api/roadmaps/<int:pk>/objectives-visibility/', api.roadmap_objectives_visibility, name='api_roadmap_objectives_visibility'),
     path('api/roadmaps/<int:roadmap_pk>/items/', api.items_collection, name='api_items'),
     path('api/items/<int:pk>/', api.item_detail, name='api_item'),

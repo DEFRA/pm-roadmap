@@ -461,6 +461,26 @@ def key_result_detail(request, pk):
     return JsonResponse(key_result_dict(kr))
 
 
+@require_http_methods(['POST'])
+def objectives_collection(request):
+    """Create an objective from a roadmap so it appears as a swim lane straight
+    away. On a team roadmap it is owned by that team (durable objectives — shown
+    via the team sync); a teamless roadmap gets a direct link. Key results (which
+    carry the period) are added later by opening the objective."""
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    title = (data.get('title') or '').strip()
+    if not title:
+        return _error('Objective title is required')
+    roadmap = get_object_or_404(Roadmap, pk=data['roadmap']) if data.get('roadmap') else None
+    team = roadmap.owning_team if roadmap else None
+    obj = Objective.objects.create(title=title, team=team)
+    if roadmap and team is None:
+        roadmap.objectives.add(obj)   # teamless roadmaps show objectives via a direct link
+    return JsonResponse({'id': obj.pk, 'title': obj.title}, status=201)
+
+
 @require_http_methods(['PUT'])
 def roadmap_objectives_visibility(request, pk):
     """Set which of the roadmap's objectives are hidden (deselected in the Manage
