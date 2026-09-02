@@ -83,17 +83,33 @@ class ColumnBuilderTests(TestCase):
         back = _pct_to_date(pct, cols, total_v)
         self.assertEqual(back, target)
 
-    def test_apply_manual_rows_overrides_auto_stack(self):
+    def test_apply_manual_rows_pins_and_reflows_auto_bars(self):
+        # A pinned bar claims its row; an overlapping auto bar must reflow off it
+        # rather than land on the same row (and hide it). Regression: a dragged
+        # key result pinned to row 1 was covered by an auto sibling also on row 1.
         class _I:
             def __init__(self, row):
                 self.row = row
-        bars = [{'item': _I(2), 'row': 0}, {'item': _I(None), 'row': 1}]
+        bars = [
+            {'item': _I(2), 'left_pct': 0, 'width_pct': 50},     # pinned to row 2
+            {'item': _I(None), 'left_pct': 0, 'width_pct': 50},  # auto, same span
+        ]
         parking = [{'item': _I(3), 'row': 0}]
         count = _apply_manual_rows(bars, parking)
-        self.assertEqual(bars[0]['row'], 2)
-        self.assertEqual(bars[1]['row'], 1)
+        self.assertEqual(bars[0]['row'], 2)   # honours the manual pin
+        self.assertEqual(bars[1]['row'], 0)   # reflowed to the lowest free row
         self.assertEqual(parking[0]['row'], 3)
         self.assertEqual(count, 4)
+
+    def test_manual_and_auto_bars_never_share_a_row(self):
+        bars = [
+            {'kr_row': 1, 'left_pct': 0, 'width_pct': 50},      # pinned to row 1
+            {'kr_row': None, 'left_pct': 0, 'width_pct': 50},   # overlaps it
+        ]
+        _apply_manual_rows(bars, [])
+        self.assertEqual(bars[0]['row'], 1)
+        self.assertEqual(bars[1]['row'], 0)
+        self.assertNotEqual(bars[0]['row'], bars[1]['row'])
 
     def test_item_without_dates_has_no_bar(self):
         cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))

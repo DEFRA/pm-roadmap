@@ -28,11 +28,25 @@ def team_list(request):
 
 def team_home(request, pk):
     team = get_object_or_404(Team.objects.select_related('organisation'), pk=pk)
-    team_sets = (
+    team_sets = list(
         ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=False)
-        .prefetch_related('objectives__key_results')
+        .prefetch_related('objectives__key_results', 'key_results')
     )
-    archived_sets = ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=True)
+    archived_sets = list(
+        ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=True)
+        .prefetch_related('objectives', 'key_results')
+    )
+
+    # Durable objectives (B2): a set's objectives are those with a key result in
+    # this period (kr.objective_set) plus any still linked by the deprecated
+    # Objective.objective_set — so a reused objective counts under each set it
+    # carries KRs in, not only its original one.
+    def _durable_count(s):
+        ids = {kr.objective_id for kr in s.key_results.all()}
+        ids |= {o.pk for o in s.objectives.all()}
+        return len(ids)
+    for s in team_sets + archived_sets:
+        s.durable_objective_count = _durable_count(s)
     team_roadmaps = Roadmap.objects.filter(owning_team=team).prefetch_related('items')
     return render(request, 'roadmap/team_home.html', {
         'team': team,

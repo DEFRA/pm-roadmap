@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import calendar
 import json
 
-from .models import Roadmap, Item, Tag, Organisation
+from .models import Roadmap, Item, Tag, Organisation, Objective
 
 # Virtual "units" per column type — compresses large periods so they don't
 # dominate the visual width relative to monthly/quarterly columns.
@@ -33,6 +33,132 @@ def roadmap_list(request):
         'roadmaps': roadmaps,
         'roadmaps_json': json.dumps(roadmap_data),
         'organisations': organisations,
+    })
+
+
+def roadmap_tree(request, pk):
+    """A tree-style infographic of a roadmap's initiatives. Under each Defra
+    outcome the branches ladder up to it:
+      • Objective → its Key results → the Activities assigned to each key result
+        → each activity's Milestones
+      • Activities not assigned to any key result hang directly off the outcome
+        (still with their milestones).
+    An activity is "assigned to a key result" via its direct key_results link
+    (set in the roadmap item modal). Outcomes with nothing linked still appear;
+    activities with no outcome collect under a placeholder."""
+    from collections import OrderedDict
+
+    roadmap = get_object_or_404(Roadmap, pk=pk)
+    activities = list(
+        roadmap.items.filter(item_type=Item.ACTIVITY)
+        .prefetch_related(
+            'tags', 'objective__key_results__objective_set', 'linked_milestones_metrics',
+            'key_results',
+        )
+        .order_by('title', 'pk')
+    )
+
+    def _new_bucket():
+        # `_objectives` is a pk-keyed dict while building (dedupes objectives that
+        # several activities share); finalised into the `objectives` list below.
+        return {'activities': [], '_objectives': OrderedDict(), '_entries': []}
+
+    def _activity_entry(act):
+        milestones = sorted(
+            (m for m in act.linked_milestones_metrics.all() if m.item_type == Item.MILESTONE),
+            key=lambda m: (m.start_date or date.max, m.title),
+        )
+        return {'activity': act, 'milestones': milestones,
+                '_kr_pks': {kr.pk for kr in act.key_results.all()}}
+
+    def _add_objective(bucket, obj):
+        if obj is not None and obj.pk not in bucket['_objectives']:
+            bucket['_objectives'][obj.pk] = {
+                'objective': obj, 'key_results': list(obj.key_results.all()),
+            }
+
+    # Seed every outcome assigned to the roadmap so empty ones still show.
+    outcome_nodes = OrderedDict(
+        (tag.pk, {'outcome': tag, **_new_bucket()})
+        for tag in roadmap.tags.all() if tag.tag_type == Tag.OUTCOME
+    )
+    no_outcome = _new_bucket()
+
+    for act in activities:
+        outs = [t for t in act.tags.all() if t.tag_type == Tag.OUTCOME]
+        entry = _activity_entry(act)
+        targets = ([no_outcome] if not outs else
+                   [outcome_nodes.setdefault(t.pk, {'outcome': t, **_new_bucket()}) for t in outs])
+        for bucket in targets:
+            bucket['_entries'].append(entry)
+            _add_objective(bucket, act.objective)
+
+    def _finalise(bucket):
+        entries = bucket.pop('_entries')
+        objectives = sorted(
+            bucket.pop('_objectives').values(), key=lambda o: o['objective'].title.lower())
+        assigned = set()
+        for o in objectives:
+            krs = []
+            for kr in o['key_results']:
+                kr_acts = [e for e in entries if kr.pk in e['_kr_pks']]
+                assigned.update(e['activity'].pk for e in kr_acts)
+                krs.append({'kr': kr, 'activities': kr_acts})
+            o['key_results'] = krs
+        bucket['objectives'] = objectives
+        # Fallback branch: activities not assigned to any displayed key result.
+        bucket['activities'] = [e for e in entries if e['activity'].pk not in assigned]
+    for node in outcome_nodes.values():
+        _finalise(node)
+    _finalise(no_outcome)
+
+    outcome_tree = sorted(outcome_nodes.values(), key=lambda n: n['outcome'].name.lower())
+
+    # The picker lets you view one outcome's tree at a time (?outcome=<pk>), all of
+    # them (default), or just the activities with no outcome (?outcome=none).
+    selected = request.GET.get('outcome') or 'all'
+    if selected == 'none':
+        display_tree, display_no_outcome = [], no_outcome
+    elif selected.isdigit() and int(selected) in outcome_nodes:
+        display_tree, display_no_outcome = [outcome_nodes[int(selected)]], None
+    else:
+        selected = 'all'
+        display_tree, display_no_outcome = outcome_tree, no_outcome
+
+    # Totals reflect what is currently on screen so they stay coherent per outcome.
+    shown = list(display_tree) + ([display_no_outcome] if display_no_outcome else [])
+    act_ids, obj_ids, kr_ids, ms_ids = set(), set(), set(), set()
+
+    def _count_activity(a):
+        act_ids.add(a['activity'].pk)
+        ms_ids.update(m.pk for m in a['milestones'])
+
+    for bucket in shown:
+        for a in bucket['activities']:          # fallback (unassigned) activities
+            _count_activity(a)
+        for o in bucket['objectives']:
+            obj_ids.add(o['objective'].pk)
+            for k in o['key_results']:
+                kr_ids.add(k['kr'].pk)
+                for a in k['activities']:       # activities nested under a key result
+                    _count_activity(a)
+
+    has_no_outcome = bool(no_outcome['activities'] or no_outcome['objectives'])
+    return render(request, 'roadmap/roadmap_tree.html', {
+        'roadmap': roadmap,
+        'team': roadmap.owning_team,
+        'outcome_tree': display_tree,
+        'no_outcome': display_no_outcome,
+        'outcome_options': outcome_tree,      # every outcome, for the picker
+        'has_no_outcome': has_no_outcome,     # whether to offer the "No outcome" option
+        'selected': selected,
+        'totals': {
+            'outcomes': len(display_tree),
+            'objectives': len(obj_ids),
+            'key_results': len(kr_ids),
+            'activities': len(act_ids),
+            'milestones': len(ms_ids),
+        },
     })
 
 
@@ -204,6 +330,22 @@ def roadmap_detail(request, pk):
     has_roadmap_objectives = bool(applied_sets or standalone_objectives)
     modal_objectives = [obj for s in applied_sets for obj in s.objectives.all()] + standalone_objectives
 
+    # Manage-objectives panel (B2): every objective available to this roadmap —
+    # shown or hidden — so each can be toggled. Team roadmaps list the whole
+    # team's durable objectives; only offered when OKR sync is on.
+    hidden_objective_ids = set(roadmap.hidden_objectives.values_list('pk', flat=True))
+    if roadmap.owning_team_id:
+        manage_objectives = list(
+            Objective.objects.filter(team_id=roadmap.owning_team_id).order_by('sort_order', 'title')
+        )
+    else:
+        manage_objectives = list(modal_objectives)
+    can_manage_objectives = bool(roadmap.sync_okrs and roadmap.owning_team_id and manage_objectives)
+    manage_objectives_json = json.dumps([
+        {'id': o.pk, 'title': o.title, 'hidden': o.pk in hidden_objective_ids}
+        for o in manage_objectives
+    ])
+
     def tag_min(t):
         return {'id': t.pk, 'name': t.name, 'colour': t.colour, 'tag_type': t.tag_type}
 
@@ -251,11 +393,15 @@ def roadmap_detail(request, pk):
         'standalone_objectives': standalone_objectives,
         'has_roadmap_objectives': has_roadmap_objectives,
         'modal_objectives': modal_objectives,
+        'can_manage_objectives': can_manage_objectives,
+        'manage_objectives_json': manage_objectives_json,
         'objectives_json': json.dumps([
             {
                 'id': o.pk,
                 'title': o.title,
                 'set_name': o.objective_set.name if o.objective_set_id else '',
+                # The objective's key results, for the item modal's KR picker.
+                'key_results': [{'id': kr.pk, 'title': kr.title} for kr in o.key_results.all()],
             }
             for o in modal_objectives
         ]),
@@ -622,35 +768,50 @@ def _build_swimlanes(items, tag_type, columns, total_v):
 
 
 class _KrSpan:
-    """Adapter that lends a key result the timeframe of its objective's set, so a
-    KeyResult (which has no dates of its own) can be placed on the timeline via
-    _item_to_bar — the key result bar spans the whole set period."""
-    def __init__(self, obj_set):
-        self.start_date = obj_set.start_date
-        self.end_date = obj_set.end_date
+    """Minimal date-range adapter so a key result can be placed via _item_to_bar."""
+    def __init__(self, start_date, end_date):
+        self.start_date = start_date
+        self.end_date = end_date
 
 
 def _kr_bar(kr, obj_set, columns, total_v):
-    bar = _item_to_bar(_KrSpan(obj_set), columns, total_v)
+    """A key result's timeline bar. Uses the KR's own dates when set (e.g. dragged
+    on the roadmap); otherwise spans its objective's set period (the default)."""
+    if kr.start_date and kr.end_date:
+        span = _KrSpan(kr.start_date, kr.end_date)
+    elif obj_set is not None:
+        span = _KrSpan(obj_set.start_date, obj_set.end_date)
+    else:
+        return None
+    bar = _item_to_bar(span, columns, total_v)
     if bar is None:
-        return None  # set has no timeframe — the key result can't be placed
+        return None  # no timeframe — the key result can't be placed
     return {'kr_title': kr.title, 'kr_id': kr.pk, 'kr_progress': kr.progress,
-            'kr_objective_id': kr.objective_id,
+            'kr_objective_id': kr.objective_id, 'kr_row': kr.row,
+            'kr_start_iso': span.start_date.isoformat() if span.start_date else '',
+            'kr_end_iso': span.end_date.isoformat() if span.end_date else '',
             'left_pct': bar['left_pct'], 'width_pct': bar['width_pct']}
 
 
-def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
-    """A lane for one roadmap objective. Its key results span the set timeframe
-    (KeyResult model bars); metric items assigned to it also plot on the metrics
-    track. Activities/milestones plot on their own tracks as usual."""
+def _make_objective_lane(name, objective, obj_items, linkable_set_ids, columns, total_v):
+    """A lane for one durable roadmap objective. The objective persists across
+    quarters; each of its key results spans *its own* period (kr.objective_set),
+    so Q1 and Q2 KRs plot in their own windows within the one lane. A KR plots if
+    it has its own B1 dates, or belongs to a linkable (team, non-archived) set.
+    Metric items assigned to the objective also plot on the metrics track;
+    activities/milestones plot on their own tracks as usual."""
     tracks = {'activities': [], 'milestones': [], 'metrics': []}
     parking_by_type = {'activities': [], 'milestones': [], 'metrics': []}
 
     kr_titles = set()
-    if objective is not None and obj_set is not None and obj_set.start_date and obj_set.end_date:
+    if objective is not None:
         for kr in objective.key_results.all():
+            has_own_dates = kr.start_date and kr.end_date
+            kr_set = kr.objective_set
+            if not has_own_dates and (kr_set is None or kr_set.pk not in linkable_set_ids):
+                continue  # a KR in a non-linkable/archived period with no own dates
             kr_titles.add(kr.title)
-            bar = _kr_bar(kr, obj_set, columns, total_v)
+            bar = _kr_bar(kr, kr_set, columns, total_v)
             if bar is not None:
                 tracks['metrics'].append(bar)
 
@@ -680,46 +841,40 @@ def _make_objective_lane(name, objective, obj_items, obj_set, columns, total_v):
 
 
 def _build_objective_swimlanes(roadmap, items, columns, total_v):
-    """Swim lanes grouped by Objective entity. Objectives come from the roadmap's
-    synced objective sets (access.applied_objective_sets) and any objectives
-    linked directly; each objective's key results plot across its set's period,
-    and items sit in the lane of their item.objective. Unassigned items fall into
-    an 'Unassigned' lane."""
+    """Swim lanes grouped by durable Objective entity. Objectives shown on this
+    roadmap come from access.roadmap_objective_ids (a team roadmap's own team
+    objectives minus any hidden, plus directly-linked objectives). Each objective
+    is one persistent lane; its key results plot across their own periods
+    (kr.objective_set), and items sit in the lane of their item.objective.
+    Unassigned items (or items whose objective isn't shown) fall into an
+    'Unassigned' lane."""
     from . import access
+    from .models import Objective
 
-    applied_sets = list(access.applied_objective_sets(roadmap))
-    direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
-    set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
-    standalone = [o for o in direct_objectives if o.pk not in set_objective_ids]
-
-    lane_specs = []  # (objective or None, owning set or None)
-    for obj_set in applied_sets:
-        objectives = list(obj_set.objectives.all())
-        if not objectives:
-            lane_specs.append((None, obj_set))  # empty-set placeholder
-        for objective in objectives:
-            lane_specs.append((objective, obj_set))
-    for objective in standalone:
-        lane_specs.append((objective, None))
-    lane_specs.sort(key=lambda pair: (
-        pair[0] is None,
-        pair[0].sort_order if pair[0] is not None else 0,
-        pair[0].title if pair[0] is not None else '',
-    ))
+    obj_ids = access.roadmap_objective_ids(roadmap)
+    objectives = list(
+        Objective.objects.filter(pk__in=obj_ids)
+        .prefetch_related('key_results__objective_set')
+        .order_by('sort_order', 'title')
+    )
+    # KRs may plot for periods this roadmap actually syncs; KRs with their own B1
+    # dates plot regardless (handled inside _make_objective_lane).
+    if roadmap.sync_okrs:
+        linkable_set_ids = set(access.linkable_sets(roadmap).values_list('pk', flat=True))
+    else:
+        linkable_set_ids = set()
 
     lanes = []
     shown_ids = set()
-    for objective, obj_set in lane_specs:
-        if objective is None:
-            lanes.append(_make_objective_lane('No objectives yet', None, [], obj_set, columns, total_v))
-            continue
+    for objective in objectives:
         shown_ids.add(objective.pk)
         obj_items = [i for i in items if i.objective_id == objective.pk]
-        lanes.append(_make_objective_lane(objective.title, objective, obj_items, obj_set, columns, total_v))
+        lanes.append(_make_objective_lane(
+            objective.title, objective, obj_items, linkable_set_ids, columns, total_v))
 
     unassigned = [i for i in items if i.objective_id is None or i.objective_id not in shown_ids]
     if unassigned:
-        lanes.append(_make_objective_lane('Unassigned', None, unassigned, None, columns, total_v))
+        lanes.append(_make_objective_lane('Unassigned', None, unassigned, linkable_set_ids, columns, total_v))
     return lanes
 
 
@@ -773,12 +928,44 @@ def _serialise_items(lanes):
     return data
 
 
+def _manual_row(bar):
+    """The explicit row a bar was pinned to (Item.row for item bars, KeyResult.row
+    for key-result bars), or None when it should be auto-stacked."""
+    item = bar.get('item')
+    if item is not None:
+        return item.row
+    return bar.get('kr_row')  # key-result bars have no item
+
+
 def _apply_manual_rows(stacked, parking):
-    """Honour Item.row when set; return the resulting row_count."""
+    """Honour a manual row when set, then re-flow the auto-stacked bars around
+    those claims so a pinned bar never ends up sharing a row (and hiding) an
+    auto-placed one. Returns the resulting row_count."""
+    # 1. Pinned bars claim their row for their horizontal span.
+    occupied = {}  # row index -> list of (left, right) spans already taken
+    auto = []
     for bar in stacked:
-        item = bar.get('item')
-        if item is not None and item.row is not None:
-            bar['row'] = item.row
+        row = _manual_row(bar)
+        left = bar.get('left_pct', 0)
+        if row is not None:
+            bar['row'] = row
+            occupied.setdefault(row, []).append((left, left + bar.get('width_pct', 0)))
+        else:
+            auto.append(bar)
+
+    # 2. Auto bars drop into the lowest row whose span is free.
+    def _overlaps(spans, left, right):
+        return any(left < e and right > s for s, e in spans)
+
+    for bar in sorted(auto, key=lambda b: b.get('left_pct', 0)):
+        left = bar.get('left_pct', 0)
+        right = left + bar.get('width_pct', 0)
+        row = 0
+        while _overlaps(occupied.get(row, []), left, right):
+            row += 1
+        bar['row'] = row
+        occupied.setdefault(row, []).append((left, right))
+
     for entry in parking:
         if entry['item'].row is not None:
             entry['row'] = entry['item'].row

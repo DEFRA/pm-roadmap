@@ -16,7 +16,7 @@ here a roadmap has organisations (M2M) plus an optional owning team, so a
 teamless roadmap's org scope is "any of its organisations".
 """
 
-from .models import ObjectiveSet
+from .models import ObjectiveSet, Objective
 
 
 def _roadmap_org_ids(roadmap):
@@ -53,9 +53,24 @@ def applied_objective_sets(roadmap):
 
 
 def roadmap_objective_ids(roadmap):
-    """Objective PKs on this roadmap — via synced sets and direct links."""
+    """Objective PKs shown on this roadmap.
+
+    Team roadmaps show ALL the owning team's (durable) objectives, minus any the
+    roadmap has hidden (see Roadmap.hidden_objectives) — the objective persists
+    across quarters as one lane. Teamless/group roadmaps still source via their
+    linkable group sets. Directly-linked objectives are always included; the
+    sync_okrs toggle gates the team/group sourcing.
+    """
     ids = set(roadmap.objectives.values_list('pk', flat=True))
-    if roadmap.sync_okrs:
+    if not roadmap.sync_okrs:
+        return ids
+    if roadmap.owning_team_id:
+        team_obj_ids = set(
+            Objective.objects.filter(team_id=roadmap.owning_team_id).values_list('pk', flat=True)
+        )
+        hidden = set(roadmap.hidden_objectives.values_list('pk', flat=True))
+        ids.update(team_obj_ids - hidden)
+    else:
         for obj_set in linkable_sets(roadmap).prefetch_related('objectives'):
             ids.update(o.pk for o in obj_set.objectives.all())
     return ids

@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 
 from .models import Roadmap, Item, Tag, Organisation, Objective, KeyResult
+from . import access
 from .access import objective_assignable_to_roadmap
 
 
@@ -50,6 +51,7 @@ def item_to_dict(i):
         'objective': i.objective_id,
         'tags': [tag_to_dict(t) for t in i.tags.all()],
         'linked_activities': [{'id': a.pk, 'title': a.title} for a in i.linked_activities.all()],
+        'key_results': [{'id': kr.pk, 'title': kr.title} for kr in i.key_results.all()],
     }
 
 
@@ -306,6 +308,20 @@ def _apply_item_fields(item, data):
             item.objective = objective
 
 
+def _reconcile_key_results(item, data):
+    """Set the activity's related key results, keeping only those that belong to
+    its objective. Runs on every save so changing the objective drops key results
+    that no longer apply, even when the client doesn't resend the selection."""
+    if 'key_results' in data:
+        ids = {int(i) for i in (data['key_results'] or [])}
+    else:
+        ids = set(item.key_results.values_list('pk', flat=True))
+    if item.objective_id and ids:
+        item.key_results.set(KeyResult.objects.filter(objective_id=item.objective_id, pk__in=ids))
+    else:
+        item.key_results.clear()
+
+
 def _next_kr_sort_order(objective):
     last = objective.key_results.order_by('-sort_order').first()
     return (last.sort_order + 1) if last else 0
@@ -323,13 +339,24 @@ def _ensure_key_result(item, previous_title=None):
         return None
     lookup_title = previous_title or item.title
     kr = KeyResult.objects.filter(objective=objective, title=lookup_title).first()
+    # A roadmap-authored metric isn't tied to a planning period, so its key result
+    # carries the item's own dates (B2) — the KR bar sits exactly where the metric
+    # is on the timeline, rather than spanning a set it doesn't belong to.
     if kr is None:
         kr = KeyResult.objects.create(
             objective=objective, title=item.title, sort_order=_next_kr_sort_order(objective),
+            start_date=item.start_date, end_date=item.end_date,
         )
-    elif kr.title != item.title:
-        kr.title = item.title
-        kr.save(update_fields=['title'])
+    else:
+        updates = []
+        if kr.title != item.title:
+            kr.title = item.title
+            updates.append('title')
+        if (kr.start_date, kr.end_date) != (item.start_date, item.end_date):
+            kr.start_date, kr.end_date = item.start_date, item.end_date
+            updates += ['start_date', 'end_date']
+        if updates:
+            kr.save(update_fields=updates)
     return kr
 
 
@@ -358,6 +385,7 @@ def items_collection(request, roadmap_pk):
     _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    _reconcile_key_results(item, data)
     # A metric assigned to an objective is a key result — back it with one.
     if item.item_type == Item.METRIC and item.objective_id:
         _ensure_key_result(item)
@@ -389,10 +417,71 @@ def item_detail(request, pk):
         _sync_roadmap_membership(item)
     if 'linked_activities' in data:
         item.linked_activities.set([int(i) for i in data['linked_activities'] or []])
+    _reconcile_key_results(item, data)
     # Keep the backing key result in step with a metric on an objective.
     if item.item_type == Item.METRIC and item.objective_id:
         _ensure_key_result(item, previous_title=previous_title)
     return JsonResponse(item_to_dict(item))
+
+
+def _apply_kr_fields(kr, data):
+    if 'start_date' in data:
+        kr.start_date = _parse_date(data['start_date'])   # '' or invalid → None (inherit set)
+    if 'end_date' in data:
+        kr.end_date = _parse_date(data['end_date'])
+    if 'row' in data:
+        row = data['row']
+        kr.row = None if row in (None, '') else max(0, int(row))
+
+
+def key_result_dict(kr):
+    return {
+        'id': kr.pk,
+        'objective': kr.objective_id,
+        'title': kr.title,
+        'start_date': kr.start_date.isoformat() if kr.start_date else '',
+        'end_date': kr.end_date.isoformat() if kr.end_date else '',
+        'row': kr.row,
+    }
+
+
+@require_http_methods(['PUT'])
+def key_result_detail(request, pk):
+    """Update a key result's timeline placement (dragged/resized on the roadmap):
+    start_date / end_date (empty clears → inherit the set period) and row."""
+    kr = get_object_or_404(KeyResult, pk=pk)
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    try:
+        _apply_kr_fields(kr, data)
+    except (ValueError, TypeError) as exc:
+        return _error(str(exc))
+    kr.save()
+    return JsonResponse(key_result_dict(kr))
+
+
+@require_http_methods(['PUT'])
+def roadmap_objectives_visibility(request, pk):
+    """Set which of the roadmap's objectives are hidden (deselected in the Manage
+    objectives panel). Body: {"hidden": [objId, ...]}. Everything not listed is
+    shown; an empty list shows all. Only objectives available to this roadmap can
+    be hidden — stray ids are ignored."""
+    roadmap = get_object_or_404(Roadmap, pk=pk)
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    hidden = data.get('hidden', [])
+    if not isinstance(hidden, list):
+        return _error('hidden must be a list of objective ids')
+    try:
+        requested = {int(i) for i in hidden}
+    except (ValueError, TypeError):
+        return _error('hidden must be a list of objective ids')
+    # Guard: only hide objectives that actually belong to this roadmap's team.
+    available = set(access.roadmap_objective_ids(roadmap)) | set(roadmap.hidden_objectives.values_list('pk', flat=True))
+    roadmap.hidden_objectives.set(requested & available)
+    return JsonResponse({'hidden': sorted(roadmap.hidden_objectives.values_list('pk', flat=True))})
 
 
 @require_http_methods(['GET'])

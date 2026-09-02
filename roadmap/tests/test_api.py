@@ -2,7 +2,9 @@ import json
 
 from django.test import TestCase, Client
 
-from roadmap.models import Organisation, Roadmap, Item, Tag, TAG_COLOUR_PALETTE
+from roadmap.models import (
+    Organisation, Roadmap, Item, Tag, Objective, KeyResult, TAG_COLOUR_PALETTE,
+)
 
 
 class ApiTestCase(TestCase):
@@ -147,6 +149,43 @@ class ItemApiTests(ApiTestCase):
     def test_create_item_invalid_type(self):
         res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {'item_type': 'bogus', 'title': 'X'})
         self.assertEqual(res.status_code, 400)
+
+    def test_assign_key_results_to_activity(self):
+        obj = Objective.objects.create(title='Faster licensing')
+        self.group.objectives.add(obj)
+        kr1 = KeyResult.objects.create(objective=obj, title='KR1')
+        kr2 = KeyResult.objects.create(objective=obj, title='KR2')
+        res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'Rebuild', 'objective': obj.pk,
+            'key_results': [kr1.pk, kr2.pk],
+        })
+        self.assertEqual(res.status_code, 201)
+        item = Item.objects.get(title='Rebuild')
+        self.assertEqual(set(item.key_results.values_list('pk', flat=True)), {kr1.pk, kr2.pk})
+        self.assertEqual({k['id'] for k in res.json()['key_results']}, {kr1.pk, kr2.pk})
+
+    def test_key_results_must_belong_to_the_objective(self):
+        obj = Objective.objects.create(title='A'); self.group.objectives.add(obj)
+        other = Objective.objects.create(title='B'); self.group.objectives.add(other)
+        kr_a = KeyResult.objects.create(objective=obj, title='KR-A')
+        kr_b = KeyResult.objects.create(objective=other, title='KR-B')
+        res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'X', 'objective': obj.pk,
+            'key_results': [kr_a.pk, kr_b.pk],   # kr_b is under a different objective
+        })
+        item = Item.objects.get(title='X')
+        self.assertEqual(list(item.key_results.values_list('pk', flat=True)), [kr_a.pk])
+
+    def test_changing_objective_drops_stale_key_results(self):
+        obj = Objective.objects.create(title='A'); self.group.objectives.add(obj)
+        other = Objective.objects.create(title='B'); self.group.objectives.add(other)
+        kr_a = KeyResult.objects.create(objective=obj, title='KR-A')
+        item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='X', objective=obj)
+        item.key_results.add(kr_a)
+        # Reassign to another objective without resending key_results.
+        res = self.put(f'/api/items/{item.pk}/', {'objective': other.pk})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(list(item.key_results.all()), [])
 
     def test_update_item(self):
         item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='Old')

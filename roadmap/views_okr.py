@@ -11,8 +11,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 
 from . import okr_periods
-from .models import Objective, ObjectiveSet
+from .models import Objective, ObjectiveSet, KeyResult
 from .forms import ObjectiveForm, ObjectiveSetForm, KeyResultFormSet, set_form_seed
+
+
+def _kr_misaligned(kr, obj_set):
+    """True if a key result has a custom roadmap date that falls outside its
+    set's window (i.e. it was dragged off the set period). Blank dates inherit
+    the set period and are never misaligned."""
+    if not (obj_set.start_date and obj_set.end_date):
+        return False
+    lo, hi = obj_set.start_date, obj_set.end_date
+    return any(d is not None and (d < lo or d > hi) for d in (kr.start_date, kr.end_date))
 
 
 def objective_list(request):
@@ -38,15 +48,47 @@ def objective_list(request):
 def objective_set_detail(request, pk):
     obj_set = get_object_or_404(
         ObjectiveSet.objects.prefetch_related(
-            'objectives__key_results', 'objectives__team', 'roadmaps',
+            'key_results__objective__team', 'objectives__key_results', 'roadmaps',
         ),
         pk=pk,
     )
+    # Durable objectives (B2): the objectives on this set page are those with a key
+    # result in this period (kr.objective_set), unioned with any legacy objectives
+    # still linked by the deprecated Objective.objective_set so nothing vanishes.
+    objectives = {kr.objective_id: kr.objective for kr in obj_set.key_results.all()}
+    for o in obj_set.objectives.all():
+        objectives.setdefault(o.pk, o)
+    objectives = sorted(objectives.values(), key=lambda o: (-o.created_at.timestamp(), o.pk))
+    # Each objective shows only THIS set's key results — a reused objective keeps
+    # its other sets' KRs elsewhere, and new KRs here don't leak into its origin.
+    period_krs = {}
+    for kr in obj_set.key_results.all():
+        period_krs.setdefault(kr.objective_id, []).append(kr)
+    for o in objectives:
+        o.card_key_results = period_krs.get(o.pk, [])
+    misaligned_krs = [kr for kr in obj_set.key_results.all() if _kr_misaligned(kr, obj_set)]
     return render(request, 'roadmap/objective_set_detail.html', {
         'objective_set': obj_set,
-        'objectives': obj_set.objectives.all(),
+        'objectives': objectives,
         'roadmaps': obj_set.roadmaps.all(),
+        'misaligned_krs': misaligned_krs,
     })
+
+
+@require_POST
+def key_result_snap_to_set(request, pk):
+    """Clear a key result's custom roadmap dates so it re-spans its set period."""
+    kr = get_object_or_404(KeyResult.objects.select_related('objective'), pk=pk)
+    # Restore the default placement: clear the custom dates (re-span the set) and
+    # the drag-assigned row so it re-stacks naturally with its siblings.
+    kr.start_date = None
+    kr.end_date = None
+    kr.row = None
+    kr.save(update_fields=['start_date', 'end_date', 'row'])
+    set_id = kr.objective_set_id
+    if set_id:
+        return redirect('roadmap:objective_set_detail', pk=set_id)
+    return redirect('roadmap:objective_detail', pk=kr.objective_id)
 
 
 def _set_home_redirect(obj_set):
@@ -96,26 +138,48 @@ def objective_set_delete(request, pk):
 # ── Objectives ────────────────────────────────────────────────────────────────
 
 def _objective_form(request, objective):
-    """Shared create/edit handler with the Key Result inline formset."""
-    form = ObjectiveForm(request.POST or None, instance=objective)
+    """Shared create/edit handler with the Key Result inline formset.
+
+    Objectives are durable (B2): authoring under a set can either create a new
+    objective or reuse an existing team one, and the key results entered here are
+    tagged with *this set's* period (kr.objective_set) so the same objective can
+    carry fresh KRs each quarter under one persistent roadmap lane.
+    """
+    # The set being authored under drives the KRs' period and the reuse picker.
+    # On POST it comes from the submitted objective_set (or the ?set= seed); on a
+    # blank GET, from the instance or the ?set= query param.
+    authored_set = objective.objective_set if objective.objective_set_id else None
+    if authored_set is None:
+        set_val = request.POST.get('objective_set') or request.GET.get('set')
+        if set_val:
+            authored_set = ObjectiveSet.objects.filter(pk=set_val).first()
+    reuse_team = authored_set.team if (authored_set and not objective.pk) else None
+
+    form = ObjectiveForm(request.POST or None, instance=objective, team=reuse_team)
     formset = KeyResultFormSet(request.POST or None, instance=objective)
 
     if request.method == 'POST' and form.is_valid() and formset.is_valid():
-        obj = form.save(commit=False)
-        # The objective inherits its set's team (team isn't asked for).
-        obj.team = obj.objective_set.team if obj.objective_set_id else None
-        obj.save()
-        formset.instance = obj
-        formset.save()
+        existing = form.cleaned_data.get('existing_objective')
+        if existing is not None:
+            obj = existing  # reuse the durable objective; keep its own set/team
+        else:
+            obj = form.save(commit=False)
+            # A new objective inherits its set's team (team isn't asked for).
+            obj.team = obj.objective_set.team if obj.objective_set_id else None
+            obj.save()
+        # Attach the entered key results to this objective for this set's period.
+        for kr in formset.save(commit=False):
+            kr.objective = obj
+            if kr.objective_set_id is None:
+                kr.objective_set = authored_set
+            kr.save()
+        for kr in formset.deleted_objects:
+            kr.delete()
         return redirect('roadmap:objective_detail', pk=obj.pk)
 
-    # The set (from the instance or the submitted/queried value) drives the team
-    # breadcrumb back to the team page.
-    obj_set = objective.objective_set if objective.objective_set_id else None
-    if obj_set is None:
-        set_val = form['objective_set'].value()
-        if set_val:
-            obj_set = ObjectiveSet.objects.filter(pk=set_val).first()
+    # authored_set already resolves the instance / submitted / ?set= sources; it
+    # drives the team breadcrumb back to the team page.
+    obj_set = authored_set
     return render(request, 'roadmap/objective_form.html', {
         'form': form,
         'formset': formset,

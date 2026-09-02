@@ -1,0 +1,21 @@
+{# Renders a list of key results. Expects `krs` (an iterable of KeyResult). #}
+{% if krs %}
+  <div style="display:flex; flex-direction:column;">
+    {% for kr in krs %}
+      <div{% if not forloop.first %} style="border-top:1px solid var(--border-subtle); margin-top:0.75rem; padding-top:0.75rem;"{% endif %}>
+        <div style="display:flex; justify-content:space-between; font-size:12px; gap:0.75rem;">
+          <span>{{ kr.title }}</span>
+          <span style="color:var(--text-muted); white-space:nowrap;">
+            {{ kr.current_value|floatformat:"-2" }} / {{ kr.target_value|floatformat:"-2" }}{{ kr.unit }}
+            &middot; {{ kr.get_status_display }}
+          </span>
+        </div>
+        <div style="height:6px; background:var(--border-subtle); border-radius:3px; overflow:hidden; margin-top:3px;">
+          <div style="height:100%; width:{{ kr.progress }}%; background:var(--color-metric, #00703c);"></div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div style="font-size:12px; color:var(--text-muted);">No key results yet.</div>
+{% endif %}

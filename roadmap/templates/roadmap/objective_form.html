@@ -17,12 +17,23 @@
     {% csrf_token %}
     {% if form.non_field_errors %}<div style="color:var(--priority-critical); margin-bottom:1rem;">{{ form.non_field_errors }}</div>{% endif %}
 
+    {% if form.allow_reuse %}
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">{{ form.existing_objective.label }}</label>
+        {{ form.existing_objective }}
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Pick one to add this period's key results to an objective you already have, or leave it to create a new one below.</div>
+        {% if form.existing_objective.errors %}<div style="font-size:12px; color:var(--priority-critical); margin-top:2px;">{{ form.existing_objective.errors }}</div>{% endif %}
+      </div>
+    {% endif %}
+
     {% for field in form %}
+      {% if field.name != 'existing_objective' %}
       <div style="margin-bottom:1rem;">
         <label style="display:block; font-size:13px; font-weight:600; margin-bottom:4px;">{{ field.label }}</label>
         {{ field }}
         {% if field.errors %}<div style="font-size:12px; color:var(--priority-critical); margin-top:2px;">{{ field.errors }}</div>{% endif %}
       </div>
+      {% endif %}
     {% endfor %}
 
     <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin-top:1.5rem;">Key results</h2>
@@ -67,5 +78,33 @@
     if (del) del.checked = true;            // saved rows: mark for deletion on save
     formEl.style.display = 'none';          // new rows: just hide (empty ⇒ ignored)
   }
+
+  // Reuse picker: when an existing objective is chosen, the title/description
+  // belong to that objective — adopt its name and lock those fields so it's clear
+  // you're only adding this period's key results to it.
+  (function () {
+    const reuse = document.getElementById('id_existing_objective');
+    if (!reuse) return;                     // only present when authoring under a set
+    const title = document.getElementById('id_title');
+    const desc = document.getElementById('id_description');
+    function syncReuse() {
+      const opt = reuse.options[reuse.selectedIndex];
+      const reusing = !!reuse.value;
+      [title, desc].forEach((el) => {
+        if (!el) return;
+        el.readOnly = reusing;
+        el.style.opacity = reusing ? '0.6' : '';
+        el.style.cursor = reusing ? 'not-allowed' : '';
+      });
+      // Option text is "Title (Set name)" — drop the set suffix for the title box.
+      const bareTitle = opt ? opt.text.replace(/\s*\([^()]*\)\s*$/, '') : '';
+      if (title) title.value = reusing ? bareTitle : (title.dataset.userValue || '');
+      if (desc && reusing) desc.value = '';
+    }
+    // Remember anything the user typed so switching back to "new" restores it.
+    if (title) title.addEventListener('input', () => { if (!reuse.value) title.dataset.userValue = title.value; });
+    reuse.addEventListener('change', syncReuse);
+    syncReuse();
+  })();
 </script>
 {% endblock %}

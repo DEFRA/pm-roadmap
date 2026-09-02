@@ -157,6 +157,10 @@ class Roadmap(models.Model):
     objective_sets = models.ManyToManyField('ObjectiveSet', blank=True, related_name='roadmaps')
     # Standalone objectives (not in a set) attached directly to this roadmap.
     objectives = models.ManyToManyField('Objective', blank=True, related_name='applied_roadmaps')
+    # Team objectives deselected on this roadmap (all show by default; this hides them).
+    hidden_objectives = models.ManyToManyField(
+        'Objective', blank=True, related_name='hidden_on_roadmaps',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -229,6 +233,12 @@ class Item(models.Model):
         blank=True,
         related_name='linked_milestones_metrics',
         limit_choices_to={'item_type': ACTIVITY},
+    )
+
+    # Activities can relate directly to the key results they contribute to. The
+    # key results must belong to the item's objective (enforced in the API).
+    key_results = models.ManyToManyField(
+        'KeyResult', blank=True, related_name='activities',
     )
 
     class Meta:
@@ -323,6 +333,9 @@ class Objective(models.Model):
 
     Ported from myproduct.pro without the user `owner` field.
     """
+    # DEPRECATED: objectives are now durable (owned by a team, reused across
+    # periods). Time-boxing lives on KeyResult.objective_set. Kept populated so
+    # group-roadmap sourcing keeps working until group objectives are made durable.
     objective_set = models.ForeignKey(
         'ObjectiveSet', on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives'
     )
@@ -368,6 +381,12 @@ class KeyResult(models.Model):
     objective = models.ForeignKey(
         'Objective', on_delete=models.CASCADE, related_name='key_results'
     )
+    # The planning period this key result belongs to. A durable objective can
+    # carry KRs across several sets (quarters); each KR spans its own set's
+    # period on the timeline. Null = no period (spans only its own dates, if any).
+    objective_set = models.ForeignKey(
+        'ObjectiveSet', on_delete=models.SET_NULL, null=True, blank=True, related_name='key_results',
+    )
     title = models.CharField(max_length=200)
     unit = models.CharField(max_length=20, blank=True, help_text='e.g. %, £, users')
     start_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -375,6 +394,15 @@ class KeyResult(models.Model):
     current_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     direction = models.CharField(max_length=10, choices=DIRECTION_CHOICES, default=INCREASE)
     status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=ON_TRACK)
+    # Timeline placement on a roadmap. Blank = span the objective's set period
+    # (the default); set (e.g. by dragging on the roadmap) = a custom window,
+    # which may be "non-aligned" with the set and is flagged on the set page.
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    row = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Manual row in the key-results track (0 = top). Blank = auto-stack.',
+    )
     sort_order = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

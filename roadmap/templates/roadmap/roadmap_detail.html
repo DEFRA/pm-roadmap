@@ -159,6 +159,36 @@
       <span style="font-size:12px; color:var(--text-muted);">None created yet</span>
       {% endfor %}
     </div>
+    {% if can_manage_objectives and group_by == 'objective' %}
+    <div class="gantt-toolbar__group no-export" style="position:relative;" @keydown.escape="closeObjPanel()">
+      <button type="button" class="btn btn-ghost" style="font-size:11px;" @click="showObjPanel ? closeObjPanel() : openObjPanel()">Manage objectives ▾</button>
+      <div x-show="showObjPanel" x-cloak @click.outside="closeObjPanel()"
+           style="position:absolute; top:100%; left:0; z-index:50; margin-top:4px; width:280px; background:var(--surface, #fff); border:1px solid var(--border-subtle); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.15); padding:0.6rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+          <span style="font-size:12px; font-weight:600;">Show as swim lanes</span>
+          <div style="display:flex; gap:4px;">
+            <button type="button" class="btn btn-ghost" style="font-size:10px; padding:2px 6px;" @click="objSelectAll()">All</button>
+            <button type="button" class="btn btn-ghost" style="font-size:10px; padding:2px 6px;" @click="objDeselectAll()">None</button>
+          </div>
+        </div>
+        <div style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:2px;">
+          <template x-for="o in manageObjectives" :key="o.id">
+            <label style="display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 4px; cursor:pointer; border-radius:4px;">
+              <input type="checkbox" x-model="o.shown">
+              <span x-text="o.title"></span>
+            </label>
+          </template>
+          <template x-if="manageObjectives.length === 0">
+            <span style="font-size:12px; color:var(--text-muted); padding:4px;">No objectives for this team yet.</span>
+          </template>
+        </div>
+        <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:0.6rem;">
+          <button type="button" class="btn btn-ghost" style="font-size:11px;" @click="closeObjPanel()">Cancel</button>
+          <button type="button" class="btn btn-primary" style="font-size:11px;" :disabled="objSaving" @click="saveObjectiveVisibility()" x-text="objSaving ? 'Saving…' : 'Save'"></button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     <script>
     function toggleCategoryFilter(categoryId, groupBy, timeScale) {
       const current = '{{ selected_categories_str }}'.split(',').filter(id => id.length > 0);
@@ -252,9 +282,11 @@
             <div class="gantt-bar gantt-bar--metric gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
             {% else %}
-            {# Key result synced from an objective set — opens the read-only objective view #}
-            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
-                 title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · open objective"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
+            {# Key result — draggable/resizable on the timeline; a click still opens the objective view #}
+            <a href="{% url 'roadmap:objective_detail' bar.kr_objective_id %}" class="gantt-bar gantt-bar--metric gantt-bar--kr gantt-bar--draggable"
+               data-kr-id="{{ bar.kr_id }}" data-start="{{ bar.kr_start_iso }}" data-end="{{ bar.kr_end_iso }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}"
+               style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px)); text-decoration:none;"
+               title="{{ bar.kr_title }} — {{ bar.kr_progress }}% to target · drag to reschedule, click to open"><span class="gantt-bar__label">{{ bar.kr_title }} · {{ bar.kr_progress }}%</span></a>
             {% endif %}
           {% endfor %}
           {% if not track.bars %}<span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--text-muted); opacity:.5;">—</span>{% endif %}
@@ -349,13 +381,14 @@
   window.OBJECTIVE_TYPE = {{ objective_type_json|safe }};
   window.ACTIVITIES = {{ activities_json|safe }};
   window.ROADMAP_OBJECTIVES = {{ objectives_json|safe }};
+  window.MANAGE_OBJECTIVES = {{ manage_objectives_json|safe }};
   window.ORG_OPTIONS = [{% for org in organisations %}{"id": {{ org.pk }}, "name": "{{ org.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
   window.TIMELINE = {{ timeline_json|safe }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=2"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=3"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
 <script src="{% static 'js/item-drag.js' %}"></script>
 {% endblock %}

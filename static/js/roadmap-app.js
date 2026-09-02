@@ -28,7 +28,7 @@ function blankItemForm() {
     id: null, item_type: 'activity', title: '', description: '',
     priority: '', size: '', start_date: '', end_date: '',
     prd_link: '', backlog_link: '', tags: [], linked_activities: [],
-    objective: '',
+    objective: '', key_results: [],
   };
 }
 
@@ -165,6 +165,35 @@ function roadmapApp() {
       } catch (e) { alert('Failed to save tags: ' + e.message); }
     },
 
+    // ── manage which objectives show as swim lanes (B2 visibility tickbox) ──
+    // Each entry is {id, title, shown}; shown=false hides the lane on this roadmap.
+    manageObjectives: (window.MANAGE_OBJECTIVES || []).map((o) => ({
+      id: o.id, title: o.title, shown: !o.hidden,
+    })),
+    showObjPanel: false,
+    objSaving: false,
+    openObjPanel() {
+      // Re-seed from the server state each time the panel opens.
+      this.manageObjectives = (window.MANAGE_OBJECTIVES || []).map((o) => ({
+        id: o.id, title: o.title, shown: !o.hidden,
+      }));
+      this.showObjPanel = true;
+    },
+    closeObjPanel() { this.showObjPanel = false; },
+    objSelectAll() { this.manageObjectives.forEach((o) => { o.shown = true; }); },
+    objDeselectAll() { this.manageObjectives.forEach((o) => { o.shown = false; }); },
+    async saveObjectiveVisibility() {
+      this.objSaving = true;
+      const hidden = this.manageObjectives.filter((o) => !o.shown).map((o) => o.id);
+      try {
+        await apiFetch(`/api/roadmaps/${this.roadmap.id}/objectives-visibility/`, 'PUT', { hidden });
+        window.location.reload();
+      } catch (e) {
+        this.objSaving = false;
+        alert('Failed to save: ' + e.message);
+      }
+    },
+
     // ── item create / edit modal ──
     showItemForm: false,
     itemForm: blankItemForm(),
@@ -187,6 +216,7 @@ function roadmapApp() {
         tags: (it.tags || []).map((t) => t.id),
         linked_activities: (it.linked_activities || []).map((a) => a.id),
         objective: it.objective ? String(it.objective) : '',
+        key_results: (it.key_results || []).map((k) => k.id),
       };
       this.itemFormMode = 'edit';
       this._resetItemPool();
@@ -206,7 +236,19 @@ function roadmapApp() {
     isItemTagSelected(id) { return this.itemForm.tags.includes(id); },
     selectObjective(id) {
       const next = String(id);
-      this.itemForm.objective = String(this.itemForm.objective) === next ? '' : next;
+      const newVal = String(this.itemForm.objective) === next ? '' : next;
+      // Key results belong to the previously chosen objective — clear on change.
+      if (newVal !== String(this.itemForm.objective)) this.itemForm.key_results = [];
+      this.itemForm.objective = newVal;
+    },
+    objectiveKeyResults() {
+      const obj = (this.roadmapObjectives || []).find(
+        (o) => String(o.id) === String(this.itemForm.objective));
+      return (obj && obj.key_results) || [];
+    },
+    toggleItemKeyResult(id) {
+      const i = this.itemForm.key_results.indexOf(id);
+      if (i === -1) this.itemForm.key_results.push(id); else this.itemForm.key_results.splice(i, 1);
     },
     toggleItemTag(id) {
       const i = this.itemForm.tags.indexOf(id);
@@ -234,6 +276,7 @@ function roadmapApp() {
         backlog_link: this.itemForm.backlog_link, tags: this.itemForm.tags,
         linked_activities: this.itemForm.linked_activities,
         objective: this.itemForm.objective ? Number(this.itemForm.objective) : '',
+        key_results: this.itemForm.key_results,
       };
       try {
         if (this.itemFormMode === 'edit') {

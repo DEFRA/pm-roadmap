@@ -45,12 +45,30 @@
     </div>
   {% endif %}
 
+  {% if misaligned_krs %}
+    <div style="border:1px solid var(--accent-warning, #f47738); border-left-width:4px; border-radius:6px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:13px;">
+      <strong>{{ misaligned_krs|length }} key result{{ misaligned_krs|length|pluralize }} {{ misaligned_krs|length|pluralize:"has,have" }} roadmap dates outside this set's window
+        ({% include "roadmap/_okr_period_line.html" with set=objective_set %}).</strong>
+      <ul style="margin:0.5rem 0 0; padding-left:1.1rem;">
+        {% for kr in misaligned_krs %}
+          <li style="margin-bottom:3px;">
+            {{ kr.objective.title }} &rsaquo; {{ kr.title }}
+            <span style="color:var(--text-muted);">({{ kr.start_date|date:"d M Y"|default:"—" }} – {{ kr.end_date|date:"d M Y"|default:"—" }})</span>
+            <form method="post" action="{% url 'roadmap:key_result_snap' kr.pk %}" style="display:inline; margin-left:6px;">{% csrf_token %}
+              <button type="submit" class="btn btn-ghost" style="font-size:11px; padding:1px 7px;">Snap to set dates</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
   <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
     <a href="{% url 'roadmap:objective_create' %}?set={{ objective_set.pk }}" class="btn btn-primary" style="font-size:12px;">+ Add objective</a>
   </div>
 
   {% for objective in objectives %}
-    {% include "roadmap/_objective_card.html" with objective=objective %}
+    {% include "roadmap/_objective_card.html" with objective=objective scoped=True key_results=objective.card_key_results %}
   {% empty %}
     <p style="color:var(--text-muted);">No objectives in this set yet.</p>
     <a href="{% url 'roadmap:objective_create' %}?set={{ objective_set.pk }}" class="btn btn-primary">Add your first objective</a>
