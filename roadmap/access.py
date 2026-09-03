@@ -77,7 +77,10 @@ def roadmap_objective_ids(roadmap):
 
 
 def objective_on_roadmap(objective, roadmap):
-    """True if this objective is on the roadmap (directly or via a synced set)."""
+    """True if this objective is on the roadmap: a durable objective owned by the
+    roadmap's team (B2), a directly-linked objective, or one via a synced set."""
+    if roadmap.sync_okrs and roadmap.owning_team_id and objective.team_id == roadmap.owning_team_id:
+        return True
     if roadmap.objectives.filter(pk=objective.pk).exists():
         return True
     if roadmap.sync_okrs and objective.objective_set_id:
