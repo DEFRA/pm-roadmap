@@ -190,7 +190,23 @@
             <button type="button" class="btn btn-ghost" style="font-size:10px; padding:2px 6px;" @click="objDeselectAll()">None</button>
           </div>
         </div>
-        <div style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:2px;">
+        {# Bulk toggle by period — tick/untick a set to show/hide its objectives #}
+        <template x-if="manageSets.length">
+          <div style="margin-bottom:0.5rem;">
+            <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px;">By period</div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <template x-for="s in manageSets" :key="s.id">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 4px; cursor:pointer; border-radius:4px;">
+                  <input type="checkbox" :checked="setShown(s)"
+                         :indeterminate.camel="setPartial(s)" @change="toggleSet(s, $event.target.checked)">
+                  <span x-text="s.name"></span>
+                </label>
+              </template>
+            </div>
+            <div style="border-top:1px solid var(--border-subtle); margin-top:0.5rem;"></div>
+          </div>
+        </template>
+        <div style="max-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:2px;">
           <template x-for="o in manageObjectives" :key="o.id">
             <label style="display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 4px; cursor:pointer; border-radius:4px;">
               <input type="checkbox" x-model="o.shown">
@@ -402,13 +418,14 @@
   window.ACTIVITIES = {{ activities_json|safe }};
   window.ROADMAP_OBJECTIVES = {{ objectives_json|safe }};
   window.MANAGE_OBJECTIVES = {{ manage_objectives_json|safe }};
+  window.MANAGE_SETS = {{ manage_sets_json|safe }};
   window.ORG_OPTIONS = [{% for org in organisations %}{"id": {{ org.pk }}, "name": "{{ org.name|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}];
   window.TIMELINE = {{ timeline_json|safe }};
 </script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=5"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=6"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>

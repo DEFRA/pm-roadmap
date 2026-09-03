@@ -5,7 +5,7 @@ from datetime import date, timedelta
 import calendar
 import json
 
-from .models import Roadmap, Item, Tag, Organisation, Objective
+from .models import Roadmap, Item, Tag, Organisation, Objective, ObjectiveSet
 
 # Virtual "units" per column type — compresses large periods so they don't
 # dominate the visual width relative to monthly/quarterly columns.
@@ -351,6 +351,21 @@ def roadmap_detail(request, pk):
         {'id': o.pk, 'title': o.title, 'hidden': o.pk in hidden_objective_ids}
         for o in manage_objectives
     ])
+    # Per-period bulk toggles: each of the team's (non-archived) sets maps to the
+    # panel objectives that have a key result in that period. Ticking/unticking a
+    # set shows/hides all of them — a convenience over the per-objective state.
+    manage_sets = []
+    if roadmap.owning_team_id:
+        _panel_obj_ids = {o.pk for o in manage_objectives}
+        team_sets = ObjectiveSet.objects.filter(
+            scope=ObjectiveSet.TEAM, team_id=roadmap.owning_team_id, archived=False,
+        ).prefetch_related('key_results').order_by('start_date', 'name')
+        for s in team_sets:
+            obj_ids = sorted({kr.objective_id for kr in s.key_results.all()
+                              if kr.objective_id in _panel_obj_ids})
+            if obj_ids:
+                manage_sets.append({'id': s.pk, 'name': s.name, 'objective_ids': obj_ids})
+    manage_sets_json = json.dumps(manage_sets)
 
     def tag_min(t):
         return {'id': t.pk, 'name': t.name, 'colour': t.colour, 'tag_type': t.tag_type}
@@ -403,6 +418,7 @@ def roadmap_detail(request, pk):
         'modal_objectives': modal_objectives,
         'can_manage_objectives': can_manage_objectives,
         'manage_objectives_json': manage_objectives_json,
+        'manage_sets_json': manage_sets_json,
         'objectives_json': json.dumps([
             {
                 'id': o.pk,

@@ -218,3 +218,43 @@ class MigrationBackfillTests(TestCase):
         standalone.refresh_from_db()
         self.assertEqual(in_set.team_id, team.pk)   # adopted the set's team
         self.assertIsNone(standalone.team_id)       # left alone
+
+
+class ManageSetsPanelTests(TestCase):
+    """The Manage objectives panel groups objectives by period (set) for bulk
+    show/hide — manage_sets_json maps each team set to its objectives' pks."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.q3 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date=date(2026, 7, 1), end_date=date(2026, 9, 30))
+        self.q4 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q4',
+            start_date=date(2026, 10, 1), end_date=date(2026, 12, 31))
+        self.a = Objective.objects.create(team=self.team, title='A')
+        self.b = Objective.objects.create(team=self.team, title='B')
+        KeyResult.objects.create(objective=self.a, objective_set=self.q3, title='a-q3')
+        KeyResult.objects.create(objective=self.a, objective_set=self.q4, title='a-q4')
+        KeyResult.objects.create(objective=self.b, objective_set=self.q4, title='b-q4')
+        self.rm = Roadmap.objects.create(name='RM', owning_team=self.team, sync_okrs=True)
+        self.rm.organisations.add(self.org)
+
+    def test_manage_sets_groups_objectives_by_period(self):
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        sets = {s['name']: set(s['objective_ids']) for s in json.loads(res.context['manage_sets_json'])}
+        self.assertEqual(sets['FY26 Q3'], {self.a.pk})            # only A has a Q3 KR
+        self.assertEqual(sets['FY26 Q4'], {self.a.pk, self.b.pk})  # A and B have Q4 KRs
+
+    def test_archived_or_empty_sets_excluded(self):
+        ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='Empty', archived=False)
+        self.q3.archived = True
+        self.q3.save(update_fields=['archived'])
+        res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
+        names = {s['name'] for s in json.loads(res.context['manage_sets_json'])}
+        self.assertNotIn('FY26 Q3', names)  # archived
+        self.assertNotIn('Empty', names)    # no objectives with KRs in it
+        self.assertIn('FY26 Q4', names)

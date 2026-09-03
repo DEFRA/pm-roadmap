@@ -170,6 +170,9 @@ function roadmapApp() {
     manageObjectives: (window.MANAGE_OBJECTIVES || []).map((o) => ({
       id: o.id, title: o.title, shown: !o.hidden,
     })),
+    // Sets group objectives by period: {id, name, objective_ids} — ticking a set
+    // shows/hides all its objectives at once (a bulk toggle over the same state).
+    manageSets: (window.MANAGE_SETS || []),
     showObjPanel: false,
     objSaving: false,
     openObjPanel() {
@@ -177,11 +180,16 @@ function roadmapApp() {
       this.manageObjectives = (window.MANAGE_OBJECTIVES || []).map((o) => ({
         id: o.id, title: o.title, shown: !o.hidden,
       }));
+      this.manageSets = (window.MANAGE_SETS || []);
       this.showObjPanel = true;
     },
     closeObjPanel() { this.showObjPanel = false; },
     objSelectAll() { this.manageObjectives.forEach((o) => { o.shown = true; }); },
     objDeselectAll() { this.manageObjectives.forEach((o) => { o.shown = false; }); },
+    _setObjs(s) { return this.manageObjectives.filter((o) => s.objective_ids.includes(o.id)); },
+    setShown(s) { const os = this._setObjs(s); return os.length > 0 && os.every((o) => o.shown); },
+    setPartial(s) { const os = this._setObjs(s); return os.some((o) => o.shown) && !os.every((o) => o.shown); },
+    toggleSet(s, value) { this._setObjs(s).forEach((o) => { o.shown = value; }); },
     async saveObjectiveVisibility() {
       this.objSaving = true;
       const hidden = this.manageObjectives.filter((o) => !o.shown).map((o) => o.id);
