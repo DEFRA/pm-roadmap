@@ -969,33 +969,42 @@ def _manual_row(bar):
 
 
 def _apply_manual_rows(stacked, parking):
-    """Honour a manual row when set, then re-flow the auto-stacked bars around
-    those claims so a pinned bar never ends up sharing a row (and hiding) an
-    auto-placed one. Returns the resulting row_count."""
-    # 1. Pinned bars claim their row for their horizontal span.
+    """Honour a manual row when set (Item.row / KeyResult.row). Auto bars keep the
+    row the stacker already gave them — so milestone label-stacking (which uses a
+    different metric than date spans) is preserved — and only move to the nearest
+    free row when their row now collides with a *manual* claim. Returns row_count.
+    """
     occupied = {}  # row index -> list of (left, right) spans already taken
+
+    def _span(bar):
+        left = bar.get('left_pct', 0)
+        return (left, left + bar.get('width_pct', 0))
+
+    def _overlaps(row, span):
+        return any(span[0] < e and span[1] > s for s, e in occupied.get(row, []))
+
+    # 1. Pinned bars claim their row for their horizontal span.
     auto = []
     for bar in stacked:
         row = _manual_row(bar)
-        left = bar.get('left_pct', 0)
         if row is not None:
             bar['row'] = row
-            occupied.setdefault(row, []).append((left, left + bar.get('width_pct', 0)))
+            occupied.setdefault(row, []).append(_span(bar))
         else:
             auto.append(bar)
 
-    # 2. Auto bars drop into the lowest row whose span is free.
-    def _overlaps(spans, left, right):
-        return any(left < e and right > s for s, e in spans)
-
-    for bar in sorted(auto, key=lambda b: b.get('left_pct', 0)):
-        left = bar.get('left_pct', 0)
-        right = left + bar.get('width_pct', 0)
-        row = 0
-        while _overlaps(occupied.get(row, []), left, right):
-            row += 1
+    # 2. Auto bars keep their stacked row unless it collides with a claimed span,
+    #    in which case they drop to the lowest free row. Each kept/moved bar is
+    #    recorded so auto bars never overlap each other either.
+    for bar in auto:
+        span = _span(bar)
+        row = bar.get('row', 0)
+        if _overlaps(row, span):
+            row = 0
+            while _overlaps(row, span):
+                row += 1
         bar['row'] = row
-        occupied.setdefault(row, []).append((left, right))
+        occupied.setdefault(row, []).append(span)
 
     for entry in parking:
         if entry['item'].row is not None:
