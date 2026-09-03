@@ -330,9 +330,16 @@ def roadmap_detail(request, pk):
 
     # Objective entities on this roadmap (synced sets + directly-linked), for the
     # header "Objectives" pills. Falls back to objective tags when there are none.
-    _direct_objectives = list(roadmap.objectives.prefetch_related('key_results'))
+    from . import access
+    # Objectives shown on this roadmap — the same durable set the swim lanes use
+    # (team objectives + direct links, minus hidden) — so the header pills stay in
+    # step. "Standalone" here = those not already listed under an applied set.
+    _shown_ids = access.roadmap_objective_ids(roadmap)
     _set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
-    standalone_objectives = [o for o in _direct_objectives if o.pk not in _set_objective_ids]
+    standalone_objectives = list(
+        Objective.objects.filter(pk__in=_shown_ids).exclude(pk__in=_set_objective_ids)
+        .prefetch_related('key_results').order_by('sort_order', 'title')
+    )
     has_roadmap_objectives = bool(applied_sets or standalone_objectives)
     modal_objectives = [obj for s in applied_sets for obj in s.objectives.all()] + standalone_objectives
 
