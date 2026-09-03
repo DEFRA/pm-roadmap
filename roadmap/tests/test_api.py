@@ -269,6 +269,20 @@ class ObjectivesApiTests(ApiTestCase):
         res = self.post('/api/objectives/', {'title': '  ', 'roadmap': self.group.pk})
         self.assertEqual(res.status_code, 400)
 
+    def test_activity_can_be_assigned_to_a_new_team_objective(self):
+        # Reproduces the bug: create an objective from a team roadmap, then assign
+        # an activity to it — a durable team objective (no set, no direct link)
+        # must be assignable.
+        team = Team.objects.create(organisation=self.org, name='Data & Digital')
+        rm = Roadmap.objects.create(name='Team RM', owning_team=team)
+        self.post('/api/objectives/', {'title': 'Speed up appeals', 'roadmap': rm.pk})
+        obj = Objective.objects.get(title='Speed up appeals')
+        res = self.post(f'/api/roadmaps/{rm.pk}/items/', {
+            'item_type': 'activity', 'title': 'Rebuild', 'objective': obj.pk,
+        })
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(Item.objects.get(title='Rebuild').objective, obj)
+
 
 class CsrfTests(TestCase):
     """The pages set the CSRF cookie; the API rejects writes without the token."""
