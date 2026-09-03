@@ -3,8 +3,9 @@ import json
 from django.test import TestCase, Client
 
 from roadmap.models import (
-    Organisation, Roadmap, Item, Tag, Objective, KeyResult, TAG_COLOUR_PALETTE,
+    Organisation, Roadmap, Item, Tag, Team, Objective, KeyResult, TAG_COLOUR_PALETTE,
 )
+from roadmap import access
 
 
 class ApiTestCase(TestCase):
@@ -243,6 +244,30 @@ class ItemApiTests(ApiTestCase):
         item = Item.objects.create(roadmap=self.group, item_type=Item.ACTIVITY, title='U')
         self.put(f'/api/items/{item.pk}/', {'tags': [self.outcome.pk]})
         self.assertIn(self.outcome.pk, set(self.group.tags.values_list('pk', flat=True)))
+
+
+class ObjectivesApiTests(ApiTestCase):
+    def test_create_objective_from_team_roadmap_is_team_owned(self):
+        team = Team.objects.create(organisation=self.org, name='Data & Digital')
+        rm = Roadmap.objects.create(name='Team RM', owning_team=team)
+        res = self.post('/api/objectives/', {'title': 'Speed up appeals', 'roadmap': rm.pk})
+        self.assertEqual(res.status_code, 201)
+        obj = Objective.objects.get(title='Speed up appeals')
+        self.assertEqual(obj.team, team)
+        self.assertIsNone(obj.objective_set_id)               # durable: no set
+        self.assertIn(obj.pk, access.roadmap_objective_ids(rm))  # shows as a lane
+
+    def test_create_objective_from_teamless_roadmap_links_directly(self):
+        res = self.post('/api/objectives/', {'title': 'Loose one', 'roadmap': self.group.pk})
+        self.assertEqual(res.status_code, 201)
+        obj = Objective.objects.get(title='Loose one')
+        self.assertIsNone(obj.team_id)
+        self.assertIn(obj, self.group.objectives.all())       # direct link
+        self.assertIn(obj.pk, access.roadmap_objective_ids(self.group))
+
+    def test_create_objective_requires_title(self):
+        res = self.post('/api/objectives/', {'title': '  ', 'roadmap': self.group.pk})
+        self.assertEqual(res.status_code, 400)
 
 
 class CsrfTests(TestCase):
