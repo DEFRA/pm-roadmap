@@ -267,6 +267,12 @@ def roadmap_detail(request, pk):
     # Assign virtual positions and width_pct to all columns
     total_v = _build_virtual_timeline(columns)
 
+    # "Today" marker position (% across the timeline), only when today falls in
+    # the visible window — the template draws a red line there.
+    today = date.today()
+    today_in_range = bool(columns) and columns[0]['start'] <= today <= columns[-1]['end']
+    today_pct = _date_to_virtual_pct(today, columns, total_v) if today_in_range else None
+
     # Roadmap type drives which objectives are shown:
     #   group   → Government Objectives (gov_objective) — central, admin-defined
     #   service → Objectives (objective) — unique to this roadmap
@@ -369,6 +375,8 @@ def roadmap_detail(request, pk):
         'time_scale': time_scale,
         'months': columns,
         'lanes': lanes,
+        'today_pct': today_pct,
+        'today_label': today.strftime('%d %b %Y'),
         'gantt_min_width_px': gantt_min_width_px,
         'item_data_json': json.dumps(item_data),
         # Header pills (membership-based, by type)

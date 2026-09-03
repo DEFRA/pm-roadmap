@@ -10,6 +10,10 @@
   body.exporting .no-export { display: none !important; }
   /* Reveal the full gantt for capture (undo the scroll-pane clipping) */
   body.exporting .gantt-wrapper { max-height: none; overflow: visible; }
+  /* "Today" marker — a red vertical line across the timeline */
+  .gantt { position: relative; }
+  .gantt-today { position: absolute; top: 0; width: 0; border-left: 2px dashed rgba(212, 53, 28, 0.55); z-index: 6; pointer-events: none; }
+  .gantt-today__label { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: var(--priority-critical, #d4351c); color: #fff; font-size: 9px; line-height: 1; padding: 2px 5px; border-radius: 0 0 3px 3px; white-space: nowrap; font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -244,6 +248,7 @@
   {# ── Gantt chart ─────────────────────────────────────────────── #}
   <div class="gantt-wrapper">
     <div class="gantt{% if show_parking %} gantt--parking{% endif %}"
+         {% if today_pct is not None %}data-today-pct="{{ today_pct }}" data-today-label="{{ today_label }}"{% endif %}
          style="min-width: {{ gantt_min_width_px }}px;{% if show_parking %} grid-template-columns: 180px 1fr {{ months|length }}fr;{% endif %}">
       <div class="gantt-header-label">
         <select onchange="window.location.href = '?group_by=' + this.value + '&time_scale={{ time_scale }}{% if selected_categories_str %}&categories={{ selected_categories_str }}{% endif %}{% if selected_tracks_str %}&tracks={{ selected_tracks_str }}{% endif %}{{ date_qs }}';"
@@ -391,4 +396,29 @@
 <script src="{% static 'js/roadmap-app.js' %}?v=3"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
+<script>
+  // Draw the red "Today" line across the timeline at the server-computed percent.
+  (function () {
+    var gantt = document.querySelector('.gantt[data-today-pct]');
+    if (!gantt) return;
+    var pct = parseFloat(gantt.dataset.todayPct);
+    var months = gantt.querySelector('.gantt-header-months');
+    if (isNaN(pct) || !months) return;
+    var line = document.createElement('div');
+    line.className = 'gantt-today no-export';
+    var label = document.createElement('span');
+    label.className = 'gantt-today__label';
+    label.textContent = gantt.dataset.todayLabel || 'Today';
+    line.appendChild(label);
+    gantt.appendChild(line);
+    function place() {
+      // months.offsetLeft/Width are relative to .gantt (position:relative), so
+      // this maps the percentage onto the actual timeline column at any width.
+      line.style.left = (months.offsetLeft + (pct / 100) * months.offsetWidth) + 'px';
+      line.style.height = gantt.scrollHeight + 'px';
+    }
+    place();
+    window.addEventListener('resize', place);
+  })();
+</script>
 {% endblock %}
