@@ -111,6 +111,34 @@ class ColumnBuilderTests(TestCase):
         self.assertEqual(bars[1]['row'], 0)
         self.assertNotEqual(bars[0]['row'], bars[1]['row'])
 
+    def test_milestone_label_rows_are_preserved(self):
+        # Milestones are points (width 0) stacked onto separate rows by label
+        # overlap in _stack_milestones. _apply_manual_rows must NOT collapse those
+        # rows back together (regression from the drag-overlap reflow).
+        class _M:
+            row = None  # auto — no manual pin
+        bars = [
+            {'item': _M(), 'left_pct': 10, 'width_pct': 0, 'row': 0},
+            {'item': _M(), 'left_pct': 12, 'width_pct': 0, 'row': 1},
+            {'item': _M(), 'left_pct': 14, 'width_pct': 0, 'row': 2},
+        ]
+        _apply_manual_rows(bars, [])
+        self.assertEqual([b['row'] for b in bars], [0, 1, 2])
+
+    def test_auto_bar_moves_only_off_a_manual_collision(self):
+        class _I:
+            def __init__(self, row):
+                self.row = row
+        bars = [
+            {'item': _I(1), 'left_pct': 0, 'width_pct': 50},                 # pinned row 1
+            {'item': _I(None), 'left_pct': 0, 'width_pct': 50, 'row': 1},    # auto, stacked on 1, overlaps → moves
+            {'item': _I(None), 'left_pct': 60, 'width_pct': 30, 'row': 0},   # auto, no collision → keeps row 0
+        ]
+        _apply_manual_rows(bars, [])
+        self.assertEqual(bars[0]['row'], 1)
+        self.assertNotEqual(bars[1]['row'], 1)   # bumped off the manual claim
+        self.assertEqual(bars[2]['row'], 0)      # untouched
+
     def test_item_without_dates_has_no_bar(self):
         cols = _build_months(date(2026, 1, 1), date(2026, 12, 31))
         total_v = _build_virtual_timeline(cols)
