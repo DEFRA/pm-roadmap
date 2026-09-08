@@ -242,6 +242,16 @@ class ManageSetsPanelTests(TestCase):
         self.rm = Roadmap.objects.create(name='RM', owning_team=self.team, sync_okrs=True)
         self.rm.organisations.add(self.org)
 
+    def test_manage_objectives_offered_on_empty_team_roadmap(self):
+        # A team roadmap with no objectives yet must still offer the panel so the
+        # first objective can be created from it (the creator lives inside it).
+        empty_team = Team.objects.create(organisation=self.org, name='Fresh')
+        rm = Roadmap.objects.create(name='Fresh RM', owning_team=empty_team, sync_okrs=True)
+        rm.organisations.add(self.org)
+        res = self.client.get(f'/{rm.pk}/?group_by=objective')
+        self.assertTrue(res.context['can_manage_objectives'])
+        self.assertEqual(json.loads(res.context['manage_objectives_json']), [])
+
     def test_manage_sets_groups_objectives_by_period(self):
         res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
         sets = {s['name']: set(s['objective_ids']) for s in json.loads(res.context['manage_sets_json'])}

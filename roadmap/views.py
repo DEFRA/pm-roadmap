@@ -353,7 +353,9 @@ def roadmap_detail(request, pk):
         )
     else:
         manage_objectives = list(modal_objectives)
-    can_manage_objectives = bool(roadmap.sync_okrs and roadmap.owning_team_id and manage_objectives)
+    # Offered on any team roadmap with OKR sync on — even with no objectives yet,
+    # so the "New objective" creator inside the panel is reachable to add the first.
+    can_manage_objectives = bool(roadmap.sync_okrs and roadmap.owning_team_id)
     manage_objectives_json = json.dumps([
         {'id': o.pk, 'title': o.title, 'hidden': o.pk in hidden_objective_ids}
         for o in manage_objectives
