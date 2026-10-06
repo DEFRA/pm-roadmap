@@ -474,10 +474,15 @@ def objectives_collection(request):
     if not title:
         return _error('Objective title is required')
     roadmap = get_object_or_404(Roadmap, pk=data['roadmap']) if data.get('roadmap') else None
-    team = roadmap.owning_team if roadmap else None
-    obj = Objective.objects.create(title=title, team=team)
-    if roadmap and team is None:
-        roadmap.objectives.add(obj)   # teamless roadmaps show objectives via a direct link
+    # A synced team roadmap gets a durable, team-owned objective (shared via the
+    # team's OKR sync, shown on every synced roadmap for that team). Otherwise —
+    # teamless, or OKR sync switched off — the objective belongs to this roadmap
+    # alone and is shown via a direct link; a team-owned one would be invisible
+    # here because team sourcing is gated on sync_okrs.
+    team_owned = bool(roadmap and roadmap.sync_okrs and roadmap.owning_team_id)
+    obj = Objective.objects.create(title=title, team=(roadmap.owning_team if team_owned else None))
+    if roadmap and not team_owned:
+        roadmap.objectives.add(obj)
     return JsonResponse({'id': obj.pk, 'title': obj.title}, status=201)
 
 
