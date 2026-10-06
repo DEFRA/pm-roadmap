@@ -265,6 +265,19 @@ class ObjectivesApiTests(ApiTestCase):
         self.assertIn(obj, self.group.objectives.all())       # direct link
         self.assertIn(obj.pk, access.roadmap_objective_ids(self.group))
 
+    def test_create_objective_from_non_synced_roadmap_links_directly(self):
+        # OKR sync off: a team-owned objective would be invisible here (team
+        # sourcing is gated on sync_okrs), so it's direct-linked to this roadmap.
+        team = Team.objects.create(organisation=self.org, name='Comms')
+        rm = Roadmap.objects.create(name='Unsynced RM', roadmap_type=Roadmap.SERVICE,
+                                    owning_team=team, sync_okrs=False)
+        res = self.post('/api/objectives/', {'title': 'Tidy the backlog', 'roadmap': rm.pk})
+        self.assertEqual(res.status_code, 201)
+        obj = Objective.objects.get(title='Tidy the backlog')
+        self.assertIsNone(obj.team_id)                           # not team-owned
+        self.assertIn(obj, rm.objectives.all())                  # direct link
+        self.assertIn(obj.pk, access.roadmap_objective_ids(rm))  # shows as a lane
+
     def test_create_objective_requires_title(self):
         res = self.post('/api/objectives/', {'title': '  ', 'roadmap': self.group.pk})
         self.assertEqual(res.status_code, 400)

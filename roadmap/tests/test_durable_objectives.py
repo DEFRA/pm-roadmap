@@ -242,6 +242,16 @@ class ManageSetsPanelTests(TestCase):
         self.rm = Roadmap.objects.create(name='RM', owning_team=self.team, sync_okrs=True)
         self.rm.organisations.add(self.org)
 
+    def test_manage_objectives_offered_on_empty_team_roadmap(self):
+        # A team roadmap with no objectives yet must still offer the panel so the
+        # first objective can be created from it (the creator lives inside it).
+        empty_team = Team.objects.create(organisation=self.org, name='Fresh')
+        rm = Roadmap.objects.create(name='Fresh RM', owning_team=empty_team, sync_okrs=True)
+        rm.organisations.add(self.org)
+        res = self.client.get(f'/{rm.pk}/?group_by=objective')
+        self.assertTrue(res.context['can_manage_objectives'])
+        self.assertEqual(json.loads(res.context['manage_objectives_json']), [])
+
     def test_manage_sets_groups_objectives_by_period(self):
         res = self.client.get(f'/{self.rm.pk}/?group_by=objective')
         sets = {s['name']: set(s['objective_ids']) for s in json.loads(res.context['manage_sets_json'])}
@@ -258,3 +268,36 @@ class ManageSetsPanelTests(TestCase):
         self.assertNotIn('FY26 Q3', names)  # archived
         self.assertNotIn('Empty', names)    # no objectives with KRs in it
         self.assertIn('FY26 Q4', names)
+
+
+class ManagePanelOfferedTests(TestCase):
+    """can_manage_objectives decides whether the Manage objectives panel (and its
+    "+ new objective" creator) is shown. It must be offered even when the roadmap
+    has no objectives yet, and on service roadmaps that aren't synced to OKRs."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+
+    def _ctx(self, rm):
+        return self.client.get(f'/{rm.pk}/?group_by=objective').context
+
+    def test_offered_on_non_synced_service_roadmap(self):
+        rm = Roadmap.objects.create(
+            name='Unsynced', roadmap_type=Roadmap.SERVICE, owning_team=self.team, sync_okrs=False)
+        ctx = self._ctx(rm)
+        self.assertTrue(ctx['can_manage_objectives'])   # can still create objectives
+        self.assertEqual(ctx['manage_objectives_json'], '[]')   # none yet, panel still shows
+        self.assertEqual(json.loads(ctx['manage_sets_json']), [])  # no set toggles when unsynced
+
+    def test_offered_on_empty_synced_team_roadmap(self):
+        rm = Roadmap.objects.create(
+            name='Synced', roadmap_type=Roadmap.SERVICE, owning_team=self.team, sync_okrs=True)
+        self.assertTrue(self._ctx(rm)['can_manage_objectives'])
+
+    def test_not_offered_on_group_roadmap(self):
+        # Group roadmaps use central Government Objectives (select via Manage tags).
+        rm = Roadmap.objects.create(name='Group', roadmap_type=Roadmap.GROUP, sync_okrs=False)
+        rm.organisations.add(self.org)
+        self.assertFalse(self._ctx(rm)['can_manage_objectives'])

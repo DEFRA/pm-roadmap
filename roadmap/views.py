@@ -347,13 +347,19 @@ def roadmap_detail(request, pk):
     # shown or hidden — so each can be toggled. Team roadmaps list the whole
     # team's durable objectives; only offered when OKR sync is on.
     hidden_objective_ids = set(roadmap.hidden_objectives.values_list('pk', flat=True))
-    if roadmap.owning_team_id:
+    if roadmap.sync_okrs and roadmap.owning_team_id:
+        # Synced team roadmap: manage the whole team's durable objectives.
         manage_objectives = list(
             Objective.objects.filter(team_id=roadmap.owning_team_id).order_by('sort_order', 'title')
         )
     else:
+        # Teamless or non-synced roadmap: manage its own (directly-linked) objectives.
         manage_objectives = list(modal_objectives)
-    can_manage_objectives = bool(roadmap.sync_okrs and roadmap.owning_team_id and manage_objectives)
+    # Offer the durable "Manage objectives" panel (create + show/hide) wherever the
+    # roadmap drives its own objectives: a synced team roadmap, or any service
+    # roadmap (which owns its objectives directly). Group roadmaps use central
+    # Government Objectives — selected via Manage tags — so no create panel there.
+    can_manage_objectives = bool((roadmap.sync_okrs and roadmap.owning_team_id) or is_service)
     manage_objectives_json = json.dumps([
         {'id': o.pk, 'title': o.title, 'hidden': o.pk in hidden_objective_ids}
         for o in manage_objectives
@@ -362,7 +368,7 @@ def roadmap_detail(request, pk):
     # panel objectives that have a key result in that period. Ticking/unticking a
     # set shows/hides all of them — a convenience over the per-objective state.
     manage_sets = []
-    if roadmap.owning_team_id:
+    if roadmap.sync_okrs and roadmap.owning_team_id:
         _panel_obj_ids = {o.pk for o in manage_objectives}
         team_sets = ObjectiveSet.objects.filter(
             scope=ObjectiveSet.TEAM, team_id=roadmap.owning_team_id, archived=False,
