@@ -5,6 +5,7 @@ no premium gate, and no membership scoping. Objectives are attached to a
 first-class Team (a dropdown) rather than resolved from the current user.
 """
 from django import forms
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
 from .models import Objective, ObjectiveSet, KeyResult, Team, Organisation, Roadmap
@@ -174,10 +175,23 @@ class ObjectiveForm(forms.ModelForm):
 
     def __init__(self, *args, team=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(archived=False)
         self.fields['objective_set'].required = False
         self.fields['objective_set'].label = 'Set'
         self.fields['objective_set'].empty_label = 'No set'
+        # An objective can only be linked to its own team's sets — not another
+        # team's. The owning team is the instance's team when editing, else the
+        # team we're authoring under (passed in). A brand-new, unowned objective
+        # may pick any set: the set it chooses is what defines its team.
+        owning_team = (self.instance.team if (self.instance and self.instance.pk) else None) or team
+        if owning_team is not None:
+            allowed = Q(scope=ObjectiveSet.TEAM, team=owning_team, archived=False)
+            # Keep whatever set it already points at selectable, so editing other
+            # fields never forces a set change, while still blocking new cross-team picks.
+            if self.instance and self.instance.objective_set_id:
+                allowed |= Q(pk=self.instance.objective_set_id)
+            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(allowed)
+        else:
+            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(archived=False)
         self.allow_reuse = team is not None
         if self.allow_reuse:
             qs = Objective.objects.filter(team=team).select_related('objective_set')
