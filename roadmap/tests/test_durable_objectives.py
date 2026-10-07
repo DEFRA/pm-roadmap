@@ -333,6 +333,14 @@ class ObjectiveSetScopingTests(TestCase):
         self.assertIn(self.mine, choices)
         self.assertIn(self.theirs, choices)
 
+    def test_create_under_a_set_offers_only_that_teams_sets(self):
+        # "New objective" is always reached with ?set=<a team's set>, so the Set
+        # dropdown on the create form must list only that team's sets.
+        res = self.client.get(f'/objectives/new/?set={self.mine.pk}')
+        qs = res.context['form'].fields['objective_set'].queryset
+        self.assertIn(self.mine, qs)
+        self.assertNotIn(self.theirs, qs)        # the other team's set isn't offered
+
     def test_editing_onto_another_teams_set_is_rejected(self):
         data = {
             'objective_set': str(self.theirs.pk), 'title': 'Speed up', 'description': '',
