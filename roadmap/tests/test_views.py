@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.test import TestCase, Client
 
@@ -190,13 +190,14 @@ class DetailContextTests(TestCase):
         self.assertEqual([t.name for t in ctx['roadmap_outcome_tags']], ['Grow'])
 
     def test_lanes_ordered_by_sort_order(self):
-        from datetime import date
         zeta = Tag.objects.create(name='Zeta', tag_type=Tag.OUTCOME, sort_order=0)
         alpha = Tag.objects.create(name='Alpha', tag_type=Tag.OUTCOME, sort_order=1)
+        # Dates within the visible window (relative to today) so the lanes render.
+        start = date.today()
         for tag in (zeta, alpha):
             item = Item.objects.create(
                 roadmap=self.group, item_type=Item.ACTIVITY, title=f'{tag.name} item',
-                start_date=date(2026, 7, 1), end_date=date(2026, 8, 1),
+                start_date=start, end_date=start + timedelta(days=30),
             )
             item.tags.add(tag)
         lanes = self.client.get(f'/{self.group.pk}/?group_by=outcome').context['lanes']
@@ -268,7 +269,7 @@ class ParkingLotTests(TestCase):
         tag = Tag.objects.create(name='Ops', tag_type=Tag.ORGANISATION, roadmap=self.rm)
         # A dated activity (plots on the timeline) and an undated one (parks).
         dated = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Dated A',
-                                    start_date=date(2026, 8, 1), end_date=date(2026, 9, 1))
+                                    start_date=date.today(), end_date=date.today() + timedelta(days=30))
         parked = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Parked A')
         undated_ms = Item.objects.create(roadmap=self.rm, item_type=Item.MILESTONE, title='Parked M')
         for i in (dated, parked, undated_ms):
@@ -303,3 +304,38 @@ class ParkingLotTests(TestCase):
         timeline = json.loads(res.context['timeline_json'])
         self.assertIn('columns', timeline)
         self.assertTrue(timeline['total_v'])
+
+
+class TimelineWindowTests(TestCase):
+    """Dated items outside the selected window are hidden entirely — not clamped
+    to the timeline edge and not parked. Undated items still park. The selectable
+    window reaches five years back."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='RM')
+        mk = lambda title, s, e: Item.objects.create(
+            roadmap=self.rm, item_type=Item.ACTIVITY, title=title, start_date=s, end_date=e)
+        mk('Before', date(2026, 1, 1), date(2026, 2, 1))     # ends before the window
+        mk('Inside', date(2026, 5, 1), date(2026, 6, 1))     # fully inside
+        mk('After', date(2026, 11, 1), date(2026, 12, 1))    # starts after the window
+        mk('Spanning', date(2025, 12, 1), date(2026, 5, 15))  # starts before, reaches in
+        self.parked = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Parked')
+
+    def _titles(self, start, end):
+        import json
+        res = self.client.get(f'/{self.rm.pk}/?start={start}&end={end}')
+        return {d['title'] for d in json.loads(res.context['item_data_json']).values()}
+
+    def test_items_outside_window_are_hidden(self):
+        titles = self._titles('2026-04-01', '2026-06-30')
+        self.assertIn('Inside', titles)
+        self.assertIn('Spanning', titles)       # overlaps from before → still shown
+        self.assertIn('Parked', titles)         # undated → parking lot, always shown
+        self.assertNotIn('Before', titles)      # out of view entirely
+        self.assertNotIn('After', titles)
+
+    def test_window_reaches_five_years_back(self):
+        res = self.client.get(f'/{self.rm.pk}/')
+        self.assertEqual(date.fromisoformat(res.context['range_min_iso']).year,
+                         date.today().year - 5)
