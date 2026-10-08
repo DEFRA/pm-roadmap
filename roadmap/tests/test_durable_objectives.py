@@ -351,3 +351,73 @@ class ObjectiveSetScopingTests(TestCase):
         self.assertEqual(res.status_code, 200)       # re-renders with an error, no redirect
         self.obj.refresh_from_db()
         self.assertEqual(self.obj.objective_set, self.mine)   # link unchanged
+
+
+class KeyResultPerSetTests(TestCase):
+    """Each key result carries its own set/period, managed on the objective edit
+    page, so one durable objective spans multiple sets with different KRs."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.other = Team.objects.create(organisation=self.org, name='Appeals')
+        self.q3 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date=date(2026, 7, 1), end_date=date(2026, 9, 30))
+        self.q4 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q4',
+            start_date=date(2026, 10, 1), end_date=date(2026, 12, 31))
+        self.theirs = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.other, name='Their Q3')
+        self.obj = Objective.objects.create(team=self.team, objective_set=self.q3, title='Speed up')
+        self.kr = KeyResult.objects.create(objective=self.obj, objective_set=self.q3, title='Q3 KR',
+                                           direction=KeyResult.INCREASE, status=KeyResult.ON_TRACK)
+
+    def _row(self, objective_set, title, kr_id=None):
+        row = {'objective_set': str(objective_set.pk), 'title': title,
+               'start_value': '0', 'target_value': '10', 'current_value': '0',
+               'direction': KeyResult.INCREASE, 'status': KeyResult.ON_TRACK}
+        if kr_id:
+            row['id'] = str(kr_id)
+        return row
+
+    def _post(self, rows):
+        data = {
+            'objective_set': str(self.q3.pk), 'title': 'Speed up', 'description': '',
+            'key_results-TOTAL_FORMS': str(len(rows)),
+            'key_results-INITIAL_FORMS': str(sum(1 for r in rows if 'id' in r)),
+            'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
+        }
+        for i, r in enumerate(rows):
+            for k, v in r.items():
+                data[f'key_results-{i}-{k}'] = v
+        return self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
+
+    def test_edit_form_scopes_each_kr_set_to_team(self):
+        res = self.client.get(f'/objectives/{self.obj.pk}/edit/')
+        sets = set(res.context['formset'].forms[0].fields['objective_set'].queryset)
+        self.assertIn(self.q3, sets)
+        self.assertIn(self.q4, sets)
+        self.assertNotIn(self.theirs, sets)       # another team's set isn't offered
+
+    def test_moving_a_kr_to_another_set_persists(self):
+        res = self._post([self._row(self.q4, 'Q3 KR', kr_id=self.kr.pk)])
+        self.assertEqual(res.status_code, 302)
+        self.kr.refresh_from_db()
+        self.assertEqual(self.kr.objective_set, self.q4)
+
+    def test_adding_a_kr_in_a_new_set_applies_objective_to_that_set(self):
+        res = self._post([
+            self._row(self.q3, 'Q3 KR', kr_id=self.kr.pk),
+            self._row(self.q4, 'Q4 KR'),
+        ])
+        self.assertEqual(res.status_code, 302)
+        spans = set(self.obj.key_results.values_list('objective_set__pk', flat=True))
+        self.assertEqual(spans, {self.q3.pk, self.q4.pk})   # now spans both periods
+
+    def test_kr_cannot_be_put_on_another_teams_set(self):
+        res = self._post([self._row(self.theirs, 'Q3 KR', kr_id=self.kr.pk)])
+        self.assertEqual(res.status_code, 200)    # re-rendered with a validation error
+        self.kr.refresh_from_db()
+        self.assertEqual(self.kr.objective_set, self.q3)   # unchanged

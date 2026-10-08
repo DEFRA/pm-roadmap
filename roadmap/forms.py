@@ -214,11 +214,20 @@ class ObjectiveForm(forms.ModelForm):
         return cleaned
 
 
+def _set_choice_label(s):
+    """Dropdown label for a set — name plus its timeframe so periods are obvious."""
+    if s.start_date and s.end_date:
+        return f'{s.name} ({s.start_date:%b %Y}–{s.end_date:%b %Y})'
+    return s.name
+
+
 class KeyResultForm(forms.ModelForm):
     class Meta:
         model = KeyResult
-        fields = ['title', 'unit', 'start_value', 'target_value', 'current_value', 'direction', 'status']
+        fields = ['objective_set', 'title', 'unit', 'start_value', 'target_value',
+                  'current_value', 'direction', 'status']
         widgets = {
+            'objective_set': forms.Select(attrs={'class': 'form-input'}),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Key result'}),
             'unit': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '%, £, users'}),
             'start_value': forms.NumberInput(attrs={'class': 'form-input'}),
@@ -227,6 +236,28 @@ class KeyResultForm(forms.ModelForm):
             'direction': forms.Select(attrs={'class': 'form-input'}),
             'status': forms.Select(attrs={'class': 'form-input'}),
         }
+
+    def __init__(self, *args, team=None, default_set=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Each key result carries its own period (set), so one durable objective can
+        # hold different KRs set-to-set. Scope the picker to the objective's team —
+        # a KR's period must be one of that team's sets — but keep the KR's current
+        # set selectable so an existing KR never loses its (maybe archived) period.
+        field = self.fields['objective_set']
+        field.required = False
+        field.label = 'Set / timeframe'
+        field.empty_label = 'No set (use own dates)'
+        if team is not None:
+            allowed = Q(scope=ObjectiveSet.TEAM, team=team, archived=False)
+            if self.instance and self.instance.objective_set_id:
+                allowed |= Q(pk=self.instance.objective_set_id)
+            field.queryset = ObjectiveSet.objects.filter(allowed)
+        else:
+            field.queryset = ObjectiveSet.objects.filter(archived=False)
+        field.label_from_instance = _set_choice_label
+        # A fresh (extra) row defaults to the set being authored under, if any.
+        if default_set is not None and not (self.instance and self.instance.pk):
+            field.initial = default_set.pk
 
     def clean(self):
         """Target must sit on the side the direction claims (equal start/target is

@@ -155,8 +155,13 @@ def _objective_form(request, objective):
             authored_set = ObjectiveSet.objects.filter(pk=set_val).first()
     reuse_team = authored_set.team if (authored_set and not objective.pk) else None
 
+    # Each key result picks its own set/period, scoped to the objective's team, so
+    # the objective can carry different KRs across sets. New rows default to the
+    # set being authored under.
+    kr_team = objective.team or (authored_set.team if authored_set else None)
     form = ObjectiveForm(request.POST or None, instance=objective, team=reuse_team)
-    formset = KeyResultFormSet(request.POST or None, instance=objective)
+    formset = KeyResultFormSet(request.POST or None, instance=objective,
+                               form_kwargs={'team': kr_team, 'default_set': authored_set})
 
     if request.method == 'POST' and form.is_valid() and formset.is_valid():
         existing = form.cleaned_data.get('existing_objective')
@@ -200,7 +205,7 @@ def objective_create(request):
 def objective_detail(request, pk):
     """Read-only view of an objective + its key results (most people just read)."""
     objective = get_object_or_404(
-        Objective.objects.select_related('objective_set', 'team').prefetch_related('key_results'),
+        Objective.objects.select_related('objective_set', 'team').prefetch_related('key_results__objective_set'),
         pk=pk,
     )
     next_objective = prev_objective = None
