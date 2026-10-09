@@ -335,11 +335,18 @@ class Objective(models.Model):
 
     Ported from myproduct.pro without the user `owner` field.
     """
-    # DEPRECATED: objectives are now durable (owned by a team, reused across
-    # periods). Time-boxing lives on KeyResult.objective_set. Kept populated so
-    # group-roadmap sourcing keeps working until group objectives are made durable.
+    # DEPRECATED membership: superseded by the `sets` M2M below. Kept as a nullable
+    # "primary" pointer (breadcrumbs / next-prev nav) and populated in step with the
+    # M2M, but set *membership* is now read from `sets`.
     objective_set = models.ForeignKey(
         'ObjectiveSet', on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives'
+    )
+    # Durable objectives can belong to several sets (planning periods) at once, so
+    # one long-lived objective spans multiple quarters as a single swim lane and
+    # can carry different key results in each. This is the source of truth for
+    # which sets an objective appears in.
+    sets = models.ManyToManyField(
+        'ObjectiveSet', blank=True, related_name='member_objectives',
     )
     team = models.ForeignKey(
         'Team', on_delete=models.SET_NULL, null=True, blank=True, related_name='objectives'

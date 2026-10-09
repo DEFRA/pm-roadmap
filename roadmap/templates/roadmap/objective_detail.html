@@ -46,7 +46,10 @@
   {% for kr in objective.key_results.all %}
     <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
       <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:baseline;">
-        <div style="font-weight:600;">{{ kr.title }}</div>
+        <div style="font-weight:600;">
+          {{ kr.title }}
+          {% if kr.objective_set %}<span style="margin-left:6px; font-size:11px; font-weight:600; color:var(--accent-gold); border:1px solid var(--accent-gold); border-radius:10px; padding:1px 8px; white-space:nowrap;">{{ kr.objective_set.name }}</span>{% endif %}
+        </div>
         <span style="font-size:12px; font-weight:600; white-space:nowrap;{% if kr.status == 'off_track' %} color:var(--accent-danger);{% elif kr.status == 'at_risk' %} color:var(--accent-warning);{% else %} color:var(--accent-green);{% endif %}">{{ kr.get_status_display }}</span>
       </div>
       <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">

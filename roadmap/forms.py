@@ -166,32 +166,34 @@ class ObjectiveForm(forms.ModelForm):
 
     class Meta:
         model = Objective
-        fields = ['objective_set', 'title', 'description']
+        fields = ['sets', 'title', 'description']
         widgets = {
-            'objective_set': forms.Select(attrs={'class': 'form-input'}),
+            'sets': forms.CheckboxSelectMultiple(),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Objective title'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
 
-    def __init__(self, *args, team=None, **kwargs):
+    def __init__(self, *args, team=None, default_set=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['objective_set'].required = False
-        self.fields['objective_set'].label = 'Set'
-        self.fields['objective_set'].empty_label = 'No set'
-        # An objective can only be linked to its own team's sets — not another
-        # team's. The owning team is the instance's team when editing, else the
-        # team we're authoring under (passed in). A brand-new, unowned objective
-        # may pick any set: the set it chooses is what defines its team.
+        # Set membership is multi-select: a durable objective can belong to several
+        # sets (periods) at once. Scope the choices to the objective's own team —
+        # keeping any sets it is already a member of visible, so editing never drops
+        # an existing (maybe archived) membership.
+        sets_field = self.fields['sets']
+        sets_field.required = False
+        sets_field.label = 'Sets'
         owning_team = (self.instance.team if (self.instance and self.instance.pk) else None) or team
         if owning_team is not None:
             allowed = Q(scope=ObjectiveSet.TEAM, team=owning_team, archived=False)
-            # Keep whatever set it already points at selectable, so editing other
-            # fields never forces a set change, while still blocking new cross-team picks.
-            if self.instance and self.instance.objective_set_id:
-                allowed |= Q(pk=self.instance.objective_set_id)
-            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(allowed)
+            if self.instance and self.instance.pk:
+                allowed |= Q(member_objectives=self.instance)
+            sets_field.queryset = ObjectiveSet.objects.filter(allowed).distinct()
         else:
-            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(archived=False)
+            sets_field.queryset = ObjectiveSet.objects.filter(archived=False)
+        sets_field.label_from_instance = _set_choice_label
+        # A brand-new objective authored under a set starts a member of that set.
+        if default_set is not None and not (self.instance and self.instance.pk):
+            sets_field.initial = [default_set.pk]
         self.allow_reuse = team is not None
         if self.allow_reuse:
             qs = Objective.objects.filter(team=team).select_related('objective_set')
@@ -214,11 +216,20 @@ class ObjectiveForm(forms.ModelForm):
         return cleaned
 
 
+def _set_choice_label(s):
+    """Dropdown label for a set — name plus its timeframe so periods are obvious."""
+    if s.start_date and s.end_date:
+        return f'{s.name} ({s.start_date:%b %Y}–{s.end_date:%b %Y})'
+    return s.name
+
+
 class KeyResultForm(forms.ModelForm):
     class Meta:
         model = KeyResult
-        fields = ['title', 'unit', 'start_value', 'target_value', 'current_value', 'direction', 'status']
+        fields = ['objective_set', 'title', 'unit', 'start_value', 'target_value',
+                  'current_value', 'direction', 'status']
         widgets = {
+            'objective_set': forms.Select(attrs={'class': 'form-input'}),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Key result'}),
             'unit': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '%, £, users'}),
             'start_value': forms.NumberInput(attrs={'class': 'form-input'}),
@@ -227,6 +238,28 @@ class KeyResultForm(forms.ModelForm):
             'direction': forms.Select(attrs={'class': 'form-input'}),
             'status': forms.Select(attrs={'class': 'form-input'}),
         }
+
+    def __init__(self, *args, team=None, default_set=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Each key result carries its own period (set), so one durable objective can
+        # hold different KRs set-to-set. Scope the picker to the objective's team —
+        # a KR's period must be one of that team's sets — but keep the KR's current
+        # set selectable so an existing KR never loses its (maybe archived) period.
+        field = self.fields['objective_set']
+        field.required = False
+        field.label = 'Set / timeframe'
+        field.empty_label = 'No set (use own dates)'
+        if team is not None:
+            allowed = Q(scope=ObjectiveSet.TEAM, team=team, archived=False)
+            if self.instance and self.instance.objective_set_id:
+                allowed |= Q(pk=self.instance.objective_set_id)
+            field.queryset = ObjectiveSet.objects.filter(allowed)
+        else:
+            field.queryset = ObjectiveSet.objects.filter(archived=False)
+        field.label_from_instance = _set_choice_label
+        # A fresh (extra) row defaults to the set being authored under, if any.
+        if default_set is not None and not (self.instance and self.instance.pk):
+            field.initial = default_set.pk
 
     def clean(self):
         """Target must sit on the side the direction claims (equal start/target is

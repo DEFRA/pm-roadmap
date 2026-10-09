@@ -151,7 +151,7 @@ class ObjectivePageTests(TestCase):
         self.assertEqual(Objective.objects.count(), 0)
 
     def test_objective_list_and_set_detail_render(self):
-        Objective.objects.create(objective_set=self.set, team=self.team, title='Shown')
+        Objective.objects.create(objective_set=self.set, team=self.team, title='Shown').sets.add(self.set)
         self.assertEqual(self.client.get(reverse('roadmap:objective_list')).status_code, 200)
         res = self.client.get(reverse('roadmap:objective_set_detail', args=[self.set.pk]))
         self.assertContains(res, 'Shown')

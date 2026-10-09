@@ -173,6 +173,7 @@ class ObjectiveSetAdmin(admin.ModelAdmin):
 @admin.register(Objective)
 class ObjectiveAdmin(admin.ModelAdmin):
     list_display = ['title', 'team', 'objective_set', 'sort_order', 'updated_at']
-    list_filter = ['team', 'objective_set']
+    list_filter = ['team', 'sets']
     search_fields = ['title', 'description']
+    filter_horizontal = ['sets']
     inlines = [KeyResultInline]
