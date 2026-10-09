@@ -124,6 +124,22 @@ function roadmapApp() {
         window.location.reload();
       } catch (e) { alert('Failed to save roadmap: ' + e.message); }
     },
+    async toggleArchiveRoadmap() {
+      const archiving = !this.roadmap.archived;
+      try {
+        await apiFetch(`/api/roadmaps/${this.roadmap.id}/`, 'PUT', { archived: archiving });
+        // Archiving sends you back to the list (it leaves the active view); un-
+        // archiving stays on the roadmap.
+        window.location.href = archiving ? '/roadmaps/' : window.location.pathname;
+      } catch (e) { alert('Failed to archive roadmap: ' + e.message); }
+    },
+    async deleteRoadmap() {
+      if (!confirm(`Delete “${this.roadmap.name}”? This permanently removes the roadmap and its items and cannot be undone.`)) return;
+      try {
+        await apiFetch(`/api/roadmaps/${this.roadmap.id}/`, 'DELETE');
+        window.location.href = '/roadmaps/';
+      } catch (e) { alert('Failed to delete roadmap: ' + e.message); }
+    },
 
     // ── manage tags modal ──
     showManage: false,

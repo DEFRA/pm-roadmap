@@ -29,6 +29,10 @@
       {% endfor %}
     </select>
     <button type="button" class="btn btn-ghost" x-show="searchName || selectedOrg" @click="clearFilters()">Clear</button>
+    <button type="button" class="btn btn-ghost" x-show="archivedCount > 0 || showArchived"
+            @click="showArchived = !showArchived"
+            :style="showArchived ? 'border-color:var(--accent-gold); color:var(--accent-gold);' : ''"
+            x-text="showArchived ? 'Back to active' : ('Archived (' + archivedCount + ')')"></button>
   </div>
 
   {% if roadmaps %}
@@ -37,6 +41,9 @@
         <li>
           <div class="roadmap-card">
             <a :href="'/' + rm.id + '/'" class="roadmap-card__name" x-text="rm.name"></a>
+            <template x-if="rm.archived">
+              <span class="tag-pill" style="font-size:10px; margin-left:6px; border-color:var(--accent-gold); color:var(--accent-gold);">Archived</span>
+            </template>
             <template x-if="rm.org_badges.length">
               <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
                 <template x-for="badge in rm.org_badges" :key="badge">
@@ -68,5 +75,5 @@
 
 {% block extra_js %}
 <script>window.ROADMAPS = {{ roadmaps_json|safe }};</script>
-<script src="{% static 'js/roadmap-list.js' %}"></script>
+<script src="{% static 'js/roadmap-list.js' %}?v=2"></script>
 {% endblock %}

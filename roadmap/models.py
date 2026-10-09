@@ -161,6 +161,8 @@ class Roadmap(models.Model):
     hidden_objectives = models.ManyToManyField(
         'Objective', blank=True, related_name='hidden_on_roadmaps',
     )
+    archived = models.BooleanField(
+        default=False, help_text='Hidden from the active roadmap list; kept for reference.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

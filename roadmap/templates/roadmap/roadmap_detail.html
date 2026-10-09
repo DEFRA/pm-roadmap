@@ -29,6 +29,7 @@
     {# Top row: name + team/orgs + actions #}
     <div class="roadmap-header__top">
       <h1 class="roadmap-header__name">{{ roadmap.name }}</h1>
+      {% if roadmap.archived %}<span class="tag-pill" style="font-size:10px; border-color:var(--accent-gold); color:var(--accent-gold);" title="Hidden from the active roadmap list">Archived</span>{% endif %}
       <span class="roadmap-header__org-name">{{ roadmap.get_roadmap_type_display }} roadmap</span>
       {% if roadmap.team %}<span class="roadmap-header__org-name">{{ roadmap.team }}</span>{% endif %}
       {% for org in roadmap.organisations.all %}
@@ -423,7 +424,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=6"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=7"></script>
 <script src="{% static 'js/reorder.js' %}"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>
