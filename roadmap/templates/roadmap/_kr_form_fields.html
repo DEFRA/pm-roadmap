@@ -6,8 +6,7 @@
         title="Delete this key result" aria-label="Delete this key result"
         style="position:absolute; top:6px; right:6px; width:22px; height:22px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-main); color:var(--text-muted); cursor:pointer; line-height:1;">&times;</button>
 
-{# Archive keeps the key result but hides it from the timeline and lists (reversible);
-   the × above deletes it for good on Save. #}
+{# Archive hides the KR but keeps it (reversible); the × above deletes it on Save. #}
 <label class="no-export" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); margin-bottom:0.5rem; cursor:pointer;">
   {{ kr.archived }} Archived (hidden from the timeline, kept for reference)
 </label>
