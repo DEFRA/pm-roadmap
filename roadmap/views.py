@@ -201,7 +201,7 @@ def roadmap_detail(request, pk):
     # ── Timeline window ──────────────────────────────────────────────────────
     # Default: start of the current quarter → end of the quarter containing the
     # last-ending item (or synced set). The user can override with ?start / ?end,
-    # constrained to one year back and ten years forward from today.
+    # constrained to five years back and ten years forward from today.
     today = date.today()
 
     def _quarter_start(d):
@@ -223,7 +223,7 @@ def roadmap_detail(request, pk):
         except (TypeError, ValueError):
             return None
 
-    range_min = _shift_years(today, -1)
+    range_min = _shift_years(today, -5)
     range_max = _shift_years(today, 10)
 
     from . import access
@@ -249,6 +249,15 @@ def roadmap_detail(request, pk):
     timeline_end = timeline_end.replace(day=calendar.monthrange(timeline_end.year, timeline_end.month)[1])
     if timeline_end < timeline_start:
         timeline_end = _quarter_end(timeline_start)
+
+    # Only plot dated items that actually overlap the selected window — a fully
+    # dated item ending before the window (or starting after it) is out of view
+    # entirely, not clamped to the edge. Undated items keep both-dates-missing and
+    # still fall through to the parking lot below.
+    items = items.exclude(
+        models.Q(start_date__isnull=False, end_date__isnull=False)
+        & (models.Q(end_date__lt=timeline_start) | models.Q(start_date__gt=timeline_end))
+    )
 
     # Query-string fragment so toolbar links keep a custom window.
     date_qs = ''

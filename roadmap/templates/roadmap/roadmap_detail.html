@@ -296,13 +296,13 @@
       </div>
 
       {% for lane in lanes %}
-        {% comment %}display:contents keeps the 6 cells as grid items while letting JS move the lane as one unit. Only tagged lanes are draggable (not Untagged).{% endcomment %}
-        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %} data-lane-key="{{ lane.lane_key }}">
+        {% comment %}display:contents keeps the 6 cells as grid items while letting JS move the lane as one unit. Tag and durable-objective lanes are draggable (not Untagged/Unassigned).{% endcomment %}
+        <div class="gantt-lane" style="display:contents"{% if lane.tag_id %} data-tag-id="{{ lane.tag_id }}"{% endif %}{% if lane.objective_id %} data-objective-id="{{ lane.objective_id }}"{% endif %} data-lane-key="{{ lane.lane_key }}">
         {% if 'metric' in visible_tracks %}
         {% with track=lane.tracks.metrics %}
         <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'metric' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% if first_visible_track == 'metric' %}
-            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            {% if lane.tag_id or lane.objective_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
             <span class="gantt-lane-name">{{ lane.name }}</span>
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Key Results</span>
@@ -333,7 +333,7 @@
         {% with track=lane.tracks.milestones %}
         <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% if first_visible_track == 'milestone' %}
-            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            {% if lane.tag_id or lane.objective_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
             <span class="gantt-lane-name">{{ lane.name }}</span>
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Milestones</span>
@@ -367,7 +367,7 @@
         {% with track=lane.tracks.activities %}
         <div class="gantt-lane-label" style="border-right:1px solid var(--border-subtle);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% if first_visible_track == 'activity' %}
-            {% if lane.tag_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
+            {% if lane.tag_id or lane.objective_id %}<span class="gantt-lane__handle no-export" title="Drag to reorder swim lane" aria-label="Drag to reorder">⠿</span>{% endif %}
             <span class="gantt-lane-name">{{ lane.name }}</span>
           {% else %}<span class="gantt-lane-name" style="visibility:hidden;">{{ lane.name }}</span>{% endif %}
           <span style="font-size:9px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em;">Activities</span>
@@ -425,7 +425,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
 <script src="{% static 'js/roadmap-app.js' %}?v=7"></script>
-<script src="{% static 'js/reorder.js' %}"></script>
+<script src="{% static 'js/reorder.js' %}?v=2"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>
   // Draw the red "Today" line across the timeline at the server-computed percent.
