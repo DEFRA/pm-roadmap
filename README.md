@@ -138,6 +138,19 @@ static/             CSS + JS (Alpine component, export)
 
 ---
 
+## Data migrations
+
+Some changes reshape existing rows rather than the schema (e.g. promoting legacy
+objective **tags** to durable **Objective** entities). These ship as management
+commands with a `--dry-run` flag that prints the plan and saves nothing.
+
+**Production is a live government database — always dry-run against a copy of it
+before running for real.** See [docs/dry-run.md](docs/dry-run.md) for what the
+dry-run is, how it works, and step-by-step instructions for running and checking
+it.
+
+---
+
 ## Notes
 
 - `DEBUG = True` and a development `SECRET_KEY` are committed for convenience —
