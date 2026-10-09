@@ -70,7 +70,7 @@
           <div class="roadmap-header__pills">
             {% if has_roadmap_objectives %}
               {% for set in applied_sets %}
-                {% for objective in set.objectives.all %}
+                {% for objective in set.member_objectives.all %}
                   <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
                      style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
                      title="{{ set.name }} · {{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>

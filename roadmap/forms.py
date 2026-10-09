@@ -166,32 +166,34 @@ class ObjectiveForm(forms.ModelForm):
 
     class Meta:
         model = Objective
-        fields = ['objective_set', 'title', 'description']
+        fields = ['sets', 'title', 'description']
         widgets = {
-            'objective_set': forms.Select(attrs={'class': 'form-input'}),
+            'sets': forms.CheckboxSelectMultiple(),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Objective title'}),
             'description': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
         }
 
-    def __init__(self, *args, team=None, **kwargs):
+    def __init__(self, *args, team=None, default_set=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['objective_set'].required = False
-        self.fields['objective_set'].label = 'Set'
-        self.fields['objective_set'].empty_label = 'No set'
-        # An objective can only be linked to its own team's sets — not another
-        # team's. The owning team is the instance's team when editing, else the
-        # team we're authoring under (passed in). A brand-new, unowned objective
-        # may pick any set: the set it chooses is what defines its team.
+        # Set membership is multi-select: a durable objective can belong to several
+        # sets (periods) at once. Scope the choices to the objective's own team —
+        # keeping any sets it is already a member of visible, so editing never drops
+        # an existing (maybe archived) membership.
+        sets_field = self.fields['sets']
+        sets_field.required = False
+        sets_field.label = 'Sets'
         owning_team = (self.instance.team if (self.instance and self.instance.pk) else None) or team
         if owning_team is not None:
             allowed = Q(scope=ObjectiveSet.TEAM, team=owning_team, archived=False)
-            # Keep whatever set it already points at selectable, so editing other
-            # fields never forces a set change, while still blocking new cross-team picks.
-            if self.instance and self.instance.objective_set_id:
-                allowed |= Q(pk=self.instance.objective_set_id)
-            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(allowed)
+            if self.instance and self.instance.pk:
+                allowed |= Q(member_objectives=self.instance)
+            sets_field.queryset = ObjectiveSet.objects.filter(allowed).distinct()
         else:
-            self.fields['objective_set'].queryset = ObjectiveSet.objects.filter(archived=False)
+            sets_field.queryset = ObjectiveSet.objects.filter(archived=False)
+        sets_field.label_from_instance = _set_choice_label
+        # A brand-new objective authored under a set starts a member of that set.
+        if default_set is not None and not (self.instance and self.instance.pk):
+            sets_field.initial = [default_set.pk]
         self.allow_reuse = team is not None
         if self.allow_reuse:
             qs = Objective.objects.filter(team=team).select_related('objective_set')

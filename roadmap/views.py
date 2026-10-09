@@ -345,13 +345,13 @@ def roadmap_detail(request, pk):
     # (team objectives + direct links, minus hidden) — so the header pills stay in
     # step. "Standalone" here = those not already listed under an applied set.
     _shown_ids = access.roadmap_objective_ids(roadmap)
-    _set_objective_ids = {o.pk for s in applied_sets for o in s.objectives.all()}
+    _set_objective_ids = {o.pk for s in applied_sets for o in s.member_objectives.all()}
     standalone_objectives = list(
         Objective.objects.filter(pk__in=_shown_ids).exclude(pk__in=_set_objective_ids)
         .prefetch_related('key_results').order_by('sort_order', 'title')
     )
     has_roadmap_objectives = bool(applied_sets or standalone_objectives)
-    modal_objectives = [obj for s in applied_sets for obj in s.objectives.all()] + standalone_objectives
+    modal_objectives = [obj for s in applied_sets for obj in s.member_objectives.all()] + standalone_objectives
 
     # Manage-objectives panel (B2): every objective available to this roadmap —
     # shown or hidden — so each can be toggled. Team roadmaps list the whole

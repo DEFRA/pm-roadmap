@@ -28,10 +28,10 @@ def _kr_misaligned(kr, obj_set):
 def objective_list(request):
     sets = (
         ObjectiveSet.objects.filter(archived=False)
-        .prefetch_related('objectives__key_results', 'objectives__team', 'organisation', 'team')
+        .prefetch_related('member_objectives__key_results', 'member_objectives__team', 'organisation', 'team')
     )
     unassigned = (
-        Objective.objects.filter(objective_set__isnull=True)
+        Objective.objects.filter(sets__isnull=True)
         .select_related('team')
         .prefetch_related('key_results')
     )
@@ -48,7 +48,7 @@ def objective_list(request):
 def objective_set_detail(request, pk):
     obj_set = get_object_or_404(
         ObjectiveSet.objects.prefetch_related(
-            'key_results__objective__team', 'objectives__key_results', 'roadmaps',
+            'key_results__objective__team', 'member_objectives__key_results', 'roadmaps',
         ),
         pk=pk,
     )
@@ -56,7 +56,7 @@ def objective_set_detail(request, pk):
     # result in this period (kr.objective_set), unioned with any legacy objectives
     # still linked by the deprecated Objective.objective_set so nothing vanishes.
     objectives = {kr.objective_id: kr.objective for kr in obj_set.key_results.all()}
-    for o in obj_set.objectives.all():
+    for o in obj_set.member_objectives.all():
         objectives.setdefault(o.pk, o)
     objectives = sorted(objectives.values(), key=lambda o: (-o.created_at.timestamp(), o.pk))
     # Each objective shows only THIS set's key results — a reused objective keeps
@@ -148,6 +148,7 @@ def _objective_form(request, objective):
     # The set being authored under drives the KRs' period and the reuse picker.
     # On POST it comes from the submitted objective_set (or the ?set= seed); on a
     # blank GET, from the instance or the ?set= query param.
+    is_create = objective.pk is None
     authored_set = objective.objective_set if objective.objective_set_id else None
     if authored_set is None:
         set_val = request.POST.get('objective_set') or request.GET.get('set')
@@ -159,27 +160,48 @@ def _objective_form(request, objective):
     # the objective can carry different KRs across sets. New rows default to the
     # set being authored under.
     kr_team = objective.team or (authored_set.team if authored_set else None)
-    form = ObjectiveForm(request.POST or None, instance=objective, team=reuse_team)
+    form = ObjectiveForm(request.POST or None, instance=objective,
+                         team=reuse_team, default_set=authored_set)
     formset = KeyResultFormSet(request.POST or None, instance=objective,
                                form_kwargs={'team': kr_team, 'default_set': authored_set})
 
     if request.method == 'POST' and form.is_valid() and formset.is_valid():
         existing = form.cleaned_data.get('existing_objective')
+        selected_sets = list(form.cleaned_data.get('sets') or [])
         if existing is not None:
-            obj = existing  # reuse the durable objective; keep its own set/team
+            obj = existing  # reuse the durable objective; add the chosen sets to it
         else:
             obj = form.save(commit=False)
-            # A new objective inherits its set's team (team isn't asked for).
-            obj.team = obj.objective_set.team if obj.objective_set_id else None
+            # Keep the primary pointer (breadcrumbs/nav) in step with membership.
+            primary = (obj.objective_set if (obj.objective_set_id and obj.objective_set in selected_sets)
+                       else (selected_sets[0] if selected_sets else authored_set))
+            obj.objective_set = primary
+            # A brand-new objective inherits its sets' team (team isn't asked for);
+            # an existing objective keeps the team it already has.
+            if obj.pk is None:
+                obj.team = primary.team if primary else None
             obj.save()
-        # Attach the entered key results to this objective for this set's period.
+            form.save_m2m()   # persist the chosen set membership
+        # Attach the entered key results to this objective, each on its own set.
+        kr_set_ids = set()
         for kr in formset.save(commit=False):
             kr.objective = obj
             if kr.objective_set_id is None:
                 kr.objective_set = authored_set
             kr.save()
+            if kr.objective_set_id:
+                kr_set_ids.add(kr.objective_set_id)
         for kr in formset.deleted_objects:
             kr.delete()
+        # Membership follows the chosen sets, plus any set a key result sits in
+        # (so a period with KRs is never dropped). Additive for a reused objective.
+        if existing is not None and selected_sets:
+            obj.sets.add(*selected_sets)
+        if kr_set_ids:
+            obj.sets.add(*kr_set_ids)
+        # An objective authored under a set is always a member of it.
+        if is_create and authored_set is not None:
+            obj.sets.add(authored_set)
         return redirect('roadmap:objective_detail', pk=obj.pk)
 
     # authored_set already resolves the instance / submitted / ?set= sources; it

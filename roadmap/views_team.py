@@ -30,11 +30,11 @@ def team_home(request, pk):
     team = get_object_or_404(Team.objects.select_related('organisation'), pk=pk)
     team_sets = list(
         ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=False)
-        .prefetch_related('objectives__key_results', 'key_results')
+        .prefetch_related('member_objectives__key_results', 'key_results')
     )
     archived_sets = list(
         ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=True)
-        .prefetch_related('objectives', 'key_results')
+        .prefetch_related('member_objectives', 'key_results')
     )
 
     # Durable objectives (B2): a set's objectives are those with a key result in
@@ -43,7 +43,7 @@ def team_home(request, pk):
     # carries KRs in, not only its original one.
     def _durable_count(s):
         ids = {kr.objective_id for kr in s.key_results.all()}
-        ids |= {o.pk for o in s.objectives.all()}
+        ids |= {o.pk for o in s.member_objectives.all()}
         return len(ids)
     for s in team_sets + archived_sets:
         s.durable_objective_count = _durable_count(s)

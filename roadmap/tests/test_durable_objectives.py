@@ -118,6 +118,7 @@ class ReuseObjectiveTests(TestCase):
             start_date=date(2026, 10, 1), end_date=date(2026, 12, 31),
         )
         self.obj = Objective.objects.create(objective_set=self.q3, team=self.team, title='Speed up')
+        self.obj.sets.add(self.q3)
 
     def _kr_formset_blank(self, prefix='key_results'):
         return {
@@ -421,3 +422,74 @@ class KeyResultPerSetTests(TestCase):
         self.assertEqual(res.status_code, 200)    # re-rendered with a validation error
         self.kr.refresh_from_db()
         self.assertEqual(self.kr.objective_set, self.q3)   # unchanged
+
+
+class MultiSetMembershipTests(TestCase):
+    """An objective can belong to several sets at once (the top-of-form checkbox
+    multi-select writes Objective.sets), so it persists as one lane across periods."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.other = Team.objects.create(organisation=self.org, name='Appeals')
+        self.q3 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date=date(2026, 7, 1), end_date=date(2026, 9, 30))
+        self.q4 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q4',
+            start_date=date(2026, 10, 1), end_date=date(2026, 12, 31))
+        self.theirs = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.other, name='Their Q3')
+        self.obj = Objective.objects.create(team=self.team, objective_set=self.q3, title='Speed up')
+        self.obj.sets.add(self.q3)
+
+    _EMPTY_FORMSET = {
+        'key_results-TOTAL_FORMS': '0', 'key_results-INITIAL_FORMS': '0',
+        'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
+    }
+
+    def test_sets_checkboxes_scoped_to_team(self):
+        res = self.client.get(f'/objectives/{self.obj.pk}/edit/')
+        sets = set(res.context['form'].fields['sets'].queryset)
+        self.assertIn(self.q3, sets)
+        self.assertIn(self.q4, sets)
+        self.assertNotIn(self.theirs, sets)        # another team's set isn't offered
+
+    def test_assigning_multiple_sets_persists(self):
+        data = {'sets': [self.q3.pk, self.q4.pk], 'title': 'Speed up', 'description': '',
+                **self._EMPTY_FORMSET}
+        res = self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(set(self.obj.sets.values_list('pk', flat=True)), {self.q3.pk, self.q4.pk})
+
+    def test_member_appears_on_each_sets_page(self):
+        self.obj.sets.add(self.q4)
+        res = self.client.get(f'/objectives/sets/{self.q4.pk}/')
+        self.assertContains(res, 'Speed up')       # shows on Q4 even with no KR there yet
+
+    def test_create_under_a_set_makes_it_a_member(self):
+        data = {'sets': [], 'title': 'Brand new', 'description': '', **self._EMPTY_FORMSET}
+        res = self.client.post(f'/objectives/new/?set={self.q4.pk}', data)
+        self.assertEqual(res.status_code, 302)
+        obj = Objective.objects.get(title='Brand new')
+        self.assertIn(self.q4, obj.sets.all())     # member of the set it was authored under
+
+    def test_a_set_with_key_results_stays_a_member_even_if_unchecked(self):
+        KeyResult.objects.create(objective=self.obj, objective_set=self.q3, title='Q3 KR',
+                                 direction=KeyResult.INCREASE, status=KeyResult.ON_TRACK)
+        # Submit Q4 only (unticking Q3), but keep the Q3 key result in the formset.
+        data = {
+            'sets': [self.q4.pk], 'title': 'Speed up', 'description': '',
+            'key_results-TOTAL_FORMS': '1', 'key_results-INITIAL_FORMS': '1',
+            'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
+            'key_results-0-id': str(self.obj.key_results.first().pk),
+            'key_results-0-objective_set': str(self.q3.pk), 'key_results-0-title': 'Q3 KR',
+            'key_results-0-start_value': '0', 'key_results-0-target_value': '10',
+            'key_results-0-current_value': '0', 'key_results-0-direction': KeyResult.INCREASE,
+            'key_results-0-status': KeyResult.ON_TRACK,
+        }
+        res = self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
+        self.assertEqual(res.status_code, 302)
+        # Q3 is kept because a key result still sits in it; Q4 added from the checkbox.
+        self.assertEqual(set(self.obj.sets.values_list('pk', flat=True)), {self.q3.pk, self.q4.pk})

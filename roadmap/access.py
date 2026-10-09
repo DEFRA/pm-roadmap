@@ -49,7 +49,7 @@ def applied_objective_sets(roadmap):
         qs = linkable_sets(roadmap)
     else:
         qs = ObjectiveSet.objects.none()
-    return qs.prefetch_related('objectives__key_results')
+    return qs.prefetch_related('member_objectives__key_results')
 
 
 def roadmap_objective_ids(roadmap):
@@ -71,8 +71,8 @@ def roadmap_objective_ids(roadmap):
         hidden = set(roadmap.hidden_objectives.values_list('pk', flat=True))
         ids.update(team_obj_ids - hidden)
     else:
-        for obj_set in linkable_sets(roadmap).prefetch_related('objectives'):
-            ids.update(o.pk for o in obj_set.objectives.all())
+        for obj_set in linkable_sets(roadmap).prefetch_related('member_objectives'):
+            ids.update(o.pk for o in obj_set.member_objectives.all())
     return ids
 
 

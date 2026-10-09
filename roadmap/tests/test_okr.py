@@ -90,12 +90,14 @@ class SyncScopingTests(TestCase):
             organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q1',
         )
         self.team_obj = Objective.objects.create(objective_set=self.team_set, team=self.team, title='Reduce wait times')
+        self.team_obj.sets.add(self.team_set)
 
         # Group-scoped set for the org.
         self.group_set = ObjectiveSet.objects.create(
             organisation=self.org, scope=ObjectiveSet.GROUP, name='Company FY26',
         )
         self.group_obj = Objective.objects.create(objective_set=self.group_set, title='Company goal')
+        self.group_obj.sets.add(self.group_set)
 
         # A roadmap owned by self.team.
         self.team_roadmap = Roadmap.objects.create(name='Licensing RM', owning_team=self.team)
