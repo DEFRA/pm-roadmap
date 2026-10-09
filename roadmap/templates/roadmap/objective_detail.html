@@ -44,6 +44,7 @@
   <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0 0 0.75rem;">Key results</h2>
 
   {% for kr in objective.key_results.all %}
+    {% if not kr.archived %}
     <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:1rem; margin-bottom:0.75rem;">
       <div style="display:flex; justify-content:space-between; gap:0.75rem; align-items:baseline;">
         <div style="font-weight:600;">
@@ -61,6 +62,7 @@
         <div style="height:100%; width:{{ kr.progress }}%; background:{% if kr.status == 'off_track' %}var(--accent-danger){% elif kr.status == 'at_risk' %}var(--accent-warning){% else %}var(--color-metric, #00af41){% endif %};"></div>
       </div>
     </div>
+    {% endif %}
   {% empty %}
     <p style="color:var(--text-muted);">No key results yet.</p>
   {% endfor %}

@@ -71,9 +71,11 @@
             {% if has_roadmap_objectives %}
               {% for set in applied_sets %}
                 {% for objective in set.member_objectives.all %}
+                  {% if not objective.archived %}
                   <a href="{% url 'roadmap:objective_detail' objective.pk %}" class="tag-pill tag-pill--clickable"
                      style="border-color:var(--accent-gold); color:var(--accent-gold); text-decoration:none;"
                      title="{{ set.name }} · {{ objective.key_results.count }} key result{{ objective.key_results.count|pluralize }}">{{ objective.title }}</a>
+                  {% endif %}
                 {% endfor %}
               {% endfor %}
               {% for objective in standalone_objectives %}

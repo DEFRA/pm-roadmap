@@ -7,6 +7,7 @@ a live reference, not a copy (see roadmap/access.py for the sync rules).
 Ported from myproduct.pro with authentication removed: pm-roadmap has no users,
 so there is no owner, no premium gate, and editing is open to everyone.
 """
+from django.db.models import Count, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 
@@ -28,10 +29,12 @@ def _kr_misaligned(kr, obj_set):
 def objective_list(request):
     sets = (
         ObjectiveSet.objects.filter(archived=False)
+        .annotate(active_objective_count=Count(
+            'member_objectives', filter=Q(member_objectives__archived=False)))
         .prefetch_related('member_objectives__key_results', 'member_objectives__team', 'organisation', 'team')
     )
     unassigned = (
-        Objective.objects.filter(sets__isnull=True)
+        Objective.objects.filter(sets__isnull=True, archived=False)
         .select_related('team')
         .prefetch_related('key_results')
     )
@@ -55,14 +58,20 @@ def objective_set_detail(request, pk):
     # Durable objectives (B2): the objectives on this set page are those with a key
     # result in this period (kr.objective_set), unioned with any legacy objectives
     # still linked by the deprecated Objective.objective_set so nothing vanishes.
-    objectives = {kr.objective_id: kr.objective for kr in obj_set.key_results.all()}
+    # Archived objectives / key results are kept for reference but hidden here.
+    objectives = {kr.objective_id: kr.objective
+                  for kr in obj_set.key_results.all()
+                  if not kr.archived and not kr.objective.archived}
     for o in obj_set.member_objectives.all():
-        objectives.setdefault(o.pk, o)
+        if not o.archived:
+            objectives.setdefault(o.pk, o)
     objectives = sorted(objectives.values(), key=lambda o: (-o.created_at.timestamp(), o.pk))
     # Each objective shows only THIS set's key results — a reused objective keeps
     # its other sets' KRs elsewhere, and new KRs here don't leak into its origin.
     period_krs = {}
     for kr in obj_set.key_results.all():
+        if kr.archived:
+            continue
         period_krs.setdefault(kr.objective_id, []).append(kr)
     for o in objectives:
         o.card_key_results = period_krs.get(o.pk, [])
@@ -262,3 +271,21 @@ def objective_delete(request, pk):
     if set_id:
         return redirect('roadmap:objective_set_detail', pk=set_id)
     return redirect('roadmap:objective_list')
+
+
+@require_POST
+def objective_archive(request, pk):
+    """Archive an objective — hidden from roadmap lanes and active lists, kept for
+    reference. Reversible via unarchive."""
+    objective = get_object_or_404(Objective, pk=pk)
+    objective.archived = True
+    objective.save(update_fields=['archived'])
+    return redirect('roadmap:objective_edit', pk=objective.pk)
+
+
+@require_POST
+def objective_unarchive(request, pk):
+    objective = get_object_or_404(Objective, pk=pk)
+    objective.archived = False
+    objective.save(update_fields=['archived'])
+    return redirect('roadmap:objective_edit', pk=objective.pk)

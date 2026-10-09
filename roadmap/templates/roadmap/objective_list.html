@@ -21,7 +21,7 @@
             {% include "roadmap/_okr_period_line.html" with set=set %}
             &middot; {{ set.get_scope_display }}{% if set.team %} &middot; {{ set.team.name }}{% endif %}
             &middot; {{ set.organisation.name }}
-            &middot; {{ set.member_objectives.count }} objective{{ set.member_objectives.count|pluralize }}
+            &middot; {{ set.active_objective_count }} objective{{ set.active_objective_count|pluralize }}
           </div>
         </div>
         <a href="{% url 'roadmap:objective_set_detail' set.pk %}" class="btn btn-ghost" style="font-size:12px;">Open</a>

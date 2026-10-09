@@ -196,7 +196,7 @@ class ObjectiveForm(forms.ModelForm):
             sets_field.initial = [default_set.pk]
         self.allow_reuse = team is not None
         if self.allow_reuse:
-            qs = Objective.objects.filter(team=team).select_related('objective_set')
+            qs = Objective.objects.filter(team=team, archived=False).select_related('objective_set')
             if self.instance and self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             field = self.fields['existing_objective']
@@ -227,7 +227,7 @@ class KeyResultForm(forms.ModelForm):
     class Meta:
         model = KeyResult
         fields = ['objective_set', 'title', 'unit', 'start_value', 'target_value',
-                  'current_value', 'direction', 'status']
+                  'current_value', 'direction', 'status', 'archived']
         widgets = {
             'objective_set': forms.Select(attrs={'class': 'form-input'}),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Key result'}),
