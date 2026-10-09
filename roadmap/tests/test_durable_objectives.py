@@ -443,3 +443,76 @@ class MultiSetMembershipTests(TestCase):
         self.assertEqual(res.status_code, 302)
         # Q3 is kept because a key result still sits in it; Q4 added from the checkbox.
         self.assertEqual(set(self.obj.sets.values_list('pk', flat=True)), {self.q3.pk, self.q4.pk})
+
+
+class ArchiveObjectiveKrTests(TestCase):
+    """Archiving hides objectives/key results from roadmaps and active lists while
+    keeping them for reference; delete removes them for good."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.q3 = ObjectiveSet.objects.create(
+            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='FY26 Q3',
+            start_date=date(2026, 7, 1), end_date=date(2026, 9, 30))
+        self.obj = Objective.objects.create(team=self.team, objective_set=self.q3, title='Speed up')
+        self.obj.sets.add(self.q3)
+        self.kr = KeyResult.objects.create(objective=self.obj, objective_set=self.q3, title='Q3 wait')
+        self.rm = Roadmap.objects.create(name='RM', owning_team=self.team, sync_okrs=True)
+        self.rm.organisations.add(self.org)
+
+    def _lanes(self):
+        cols = _build_months(date(2026, 7, 1), date(2026, 9, 30))
+        return _build_objective_swimlanes(self.rm, [], cols, _build_virtual_timeline(cols))
+
+    def test_archived_objective_absent_from_roadmap_and_lanes(self):
+        self.assertIn(self.obj.pk, access.roadmap_objective_ids(self.rm))   # visible first
+        self.obj.archived = True
+        self.obj.save(update_fields=['archived'])
+        self.assertNotIn(self.obj.pk, access.roadmap_objective_ids(self.rm))
+        self.assertNotIn('Speed up', [ln['name'] for ln in self._lanes()])
+
+    def test_archived_key_result_absent_from_lane(self):
+        bars = next(ln for ln in self._lanes() if ln['name'] == 'Speed up')['tracks']['metrics']['bars']
+        self.assertEqual([b['kr_title'] for b in bars], ['Q3 wait'])   # shown first
+        self.kr.archived = True
+        self.kr.save(update_fields=['archived'])
+        bars = next(ln for ln in self._lanes() if ln['name'] == 'Speed up')['tracks']['metrics']['bars']
+        self.assertEqual(bars, [])
+
+    def test_archived_objective_hidden_on_set_page(self):
+        self.obj.archived = True
+        self.obj.save(update_fields=['archived'])
+        res = self.client.get(f'/objectives/sets/{self.q3.pk}/')
+        self.assertNotContains(res, 'Speed up')
+
+    def test_archive_and_unarchive_views_toggle_flag(self):
+        res = self.client.post(f'/objectives/{self.obj.pk}/archive/')
+        self.assertEqual(res.status_code, 302)
+        self.obj.refresh_from_db()
+        self.assertTrue(self.obj.archived)
+        self.client.post(f'/objectives/{self.obj.pk}/unarchive/')
+        self.obj.refresh_from_db()
+        self.assertFalse(self.obj.archived)
+
+    def test_delete_objective_removes_it(self):
+        res = self.client.post(f'/objectives/{self.obj.pk}/delete/')
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(Objective.objects.filter(pk=self.obj.pk).exists())
+
+    def test_editing_a_kr_can_archive_it(self):
+        data = {
+            'sets': [self.q3.pk], 'title': 'Speed up', 'description': '',
+            'key_results-TOTAL_FORMS': '1', 'key_results-INITIAL_FORMS': '1',
+            'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
+            'key_results-0-id': str(self.kr.pk), 'key_results-0-objective_set': str(self.q3.pk),
+            'key_results-0-title': 'Q3 wait', 'key_results-0-start_value': '0',
+            'key_results-0-target_value': '10', 'key_results-0-current_value': '0',
+            'key_results-0-direction': KeyResult.INCREASE, 'key_results-0-status': KeyResult.ON_TRACK,
+            'key_results-0-archived': 'on',
+        }
+        res = self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
+        self.assertEqual(res.status_code, 302)
+        self.kr.refresh_from_db()
+        self.assertTrue(self.kr.archived)
