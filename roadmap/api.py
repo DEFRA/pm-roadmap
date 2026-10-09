@@ -209,6 +209,22 @@ def tags_reorder(request):
     return JsonResponse({'ok': True, 'count': len(ids)})
 
 
+@require_http_methods(['POST'])
+def objectives_reorder(request):
+    """Persist a new objective swim-lane order. Body: {"ids": [objectiveId, ...]}
+    top-to-bottom; each objective's sort_order is set to its index. Used when the
+    gantt is grouped by durable Objective (the lanes carry objective ids, not tags)."""
+    data = _json_body(request)
+    if data is None:
+        return _error('Invalid JSON body')
+    ids = data.get('ids')
+    if not isinstance(ids, list):
+        return _error('"ids" must be a list of objective ids')
+    for index, obj_id in enumerate(ids):
+        Objective.objects.filter(pk=obj_id).update(sort_order=index)
+    return JsonResponse({'ok': True, 'count': len(ids)})
+
+
 # ── Roadmaps ──────────────────────────────────────────────────────────────────
 
 def _apply_roadmap_fields(roadmap, data):

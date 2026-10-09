@@ -3,8 +3,10 @@
  * Each main swim lane is a `.gantt-lane` wrapper (display:contents) holding its
  * 6 grid cells. Grabbing the handle and dragging up/down live-reorders the lanes
  * — when the pointer passes the vertical midpoint of a neighbouring lane, the
- * dragged lane snaps into that slot. On drop, the new order is persisted via
- * POST /api/tags/reorder/. "Untagged" (no data-tag-id) is fixed and stays last.
+ * dragged lane snaps into that slot. On drop the new order is persisted: tag
+ * lanes (grouped by outcome/team/gov objective) via POST /api/tags/reorder/,
+ * durable-objective lanes via POST /api/objectives/reorder/. "Untagged" /
+ * "Unassigned" (no data id) is fixed and stays last.
  *
  * Touch/mobile is intentionally not handled yet.
  */
@@ -18,8 +20,17 @@
     const gantt = document.querySelector('.gantt');
     if (!gantt) return;
 
-    const draggableLanes = () =>
-      Array.from(gantt.querySelectorAll('.gantt-lane[data-tag-id]'));
+    // Draggable lanes are the durable-objective lanes when grouped by objective,
+    // otherwise the tag lanes. A grouping is homogeneous, so detect which by what
+    // the gantt actually contains; the matching reorder endpoint + id attribute
+    // follow from that.
+    const byObjective = () => gantt.querySelector('.gantt-lane[data-objective-id]') !== null;
+    const laneIdAttr = () => (byObjective() ? 'objectiveId' : 'tagId');
+    const reorderUrl = () =>
+      byObjective() ? '/api/objectives/reorder/' : '/api/tags/reorder/';
+    const laneSelector = () =>
+      byObjective() ? '.gantt-lane[data-objective-id]' : '.gantt-lane[data-tag-id]';
+    const draggableLanes = () => Array.from(gantt.querySelectorAll(laneSelector()));
 
     // How far the pointer must cross into a neighbouring lane before the order
     // snaps (fraction of that lane's height). 0.33 = a third; direction-aware so
@@ -62,10 +73,11 @@
       if (ref) {
         if (dragged.nextElementSibling !== ref) gantt.insertBefore(dragged, ref);
       } else {
-        // Past all lanes → place last, but keep the Untagged lane trailing.
-        const untagged = gantt.querySelector('.gantt-lane:not([data-tag-id])');
-        if (untagged) {
-          if (untagged.previousElementSibling !== dragged) gantt.insertBefore(dragged, untagged);
+        // Past all lanes → place last, but keep the fixed (Untagged/Unassigned)
+        // lane trailing.
+        const fixed = gantt.querySelector('.gantt-lane:not([data-tag-id]):not([data-objective-id])');
+        if (fixed) {
+          if (fixed.previousElementSibling !== dragged) gantt.insertBefore(dragged, fixed);
         } else if (gantt.lastElementChild !== dragged) {
           gantt.appendChild(dragged);
         }
@@ -80,11 +92,12 @@
       window.removeEventListener('pointerup', onPointerUp);
       dragged = null;
 
-      const ids = draggableLanes().map((l) => l.dataset.tagId);
+      const attr = laneIdAttr();
+      const ids = draggableLanes().map((l) => l.dataset[attr]);
       if (ids.join(',') === startOrder.join(',')) return;  // no change
 
       try {
-        await fetch('/api/tags/reorder/', {
+        await fetch(reorderUrl(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
           body: JSON.stringify({ ids: ids.map(Number) }),
@@ -97,12 +110,12 @@
     gantt.addEventListener('pointerdown', (e) => {
       const handle = e.target.closest('.gantt-lane__handle');
       if (!handle || e.button !== 0) return;
-      const lane = handle.closest('.gantt-lane[data-tag-id]');
+      const lane = handle.closest(laneSelector());
       if (!lane) return;
 
       e.preventDefault();
       dragged = lane;
-      startOrder = draggableLanes().map((l) => l.dataset.tagId);
+      startOrder = draggableLanes().map((l) => l.dataset[laneIdAttr()]);
       lane.classList.add('gantt-lane--dragging');
       document.body.classList.add('gantt-reordering');
       window.addEventListener('pointermove', onPointerMove);

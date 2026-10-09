@@ -296,6 +296,19 @@ class ObjectivesApiTests(ApiTestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(Item.objects.get(title='Rebuild').objective, obj)
 
+    def test_reorder_sets_objective_sort_order(self):
+        team = Team.objects.create(organisation=self.org, name='Licensing')
+        a = Objective.objects.create(team=team, title='A')
+        b = Objective.objects.create(team=team, title='B')
+        c = Objective.objects.create(team=team, title='C')
+        res = self.post('/api/objectives/reorder/', {'ids': [c.pk, a.pk, b.pk]})
+        self.assertEqual(res.status_code, 200)
+        a.refresh_from_db(); b.refresh_from_db(); c.refresh_from_db()
+        self.assertEqual((c.sort_order, a.sort_order, b.sort_order), (0, 1, 2))
+
+    def test_reorder_requires_list(self):
+        self.assertEqual(self.post('/api/objectives/reorder/', {'ids': 'nope'}).status_code, 400)
+
 
 class CsrfTests(TestCase):
     """The pages set the CSRF cookie; the API rejects writes without the token."""
