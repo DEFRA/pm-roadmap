@@ -11,7 +11,23 @@
       &rsaquo; {% if objective %}Edit{% else %}New objective{% endif %}
     </div>
   {% endif %}
-  <h1 style="margin:0 0 1.25rem;">{% if objective %}Edit objective{% else %}New objective{% endif %}</h1>
+  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin:0 0 1.25rem;">
+    <h1 style="margin:0;">{% if objective %}Edit objective{% else %}New objective{% endif %}</h1>
+    {% if objective %}
+      {# Archive / delete the whole objective — separate POSTs (can't nest in the main form). #}
+      <form method="post" style="margin:0 0 0 auto;"
+            action="{% if objective.archived %}{% url 'roadmap:objective_unarchive' objective.pk %}{% else %}{% url 'roadmap:objective_archive' objective.pk %}{% endif %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px;">{% if objective.archived %}Unarchive{% else %}Archive{% endif %}</button>
+      </form>
+      <form method="post" action="{% url 'roadmap:objective_delete' objective.pk %}" style="margin:0;"
+            onsubmit="return confirmDeleteObjective('{{ objective.title|escapejs }}');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="font-size:12px; color:var(--priority-critical);">Delete</button>
+      </form>
+    {% endif %}
+  </div>
+  {% if objective.archived %}<div style="font-size:12px; color:var(--accent-gold); margin:-0.75rem 0 1rem;">Archived — hidden from roadmaps and lists, kept for reference.</div>{% endif %}
 
   <form method="post">
     {% csrf_token %}
@@ -62,23 +78,6 @@
       <a href="{% if objective %}{% url 'roadmap:objective_detail' objective.pk %}{% elif objective_set %}{% url 'roadmap:objective_set_detail' objective_set.pk %}{% else %}{% url 'roadmap:objective_list' %}{% endif %}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
-
-  {% if objective %}
-    {# Archive / delete the whole objective — separate POSTs (can't nest in the form above). #}
-    <div style="display:flex; gap:8px; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-subtle); align-items:center; flex-wrap:wrap;">
-      <form method="post" style="margin:0;"
-            action="{% if objective.archived %}{% url 'roadmap:objective_unarchive' objective.pk %}{% else %}{% url 'roadmap:objective_archive' objective.pk %}{% endif %}">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-ghost">{% if objective.archived %}Unarchive objective{% else %}Archive objective{% endif %}</button>
-      </form>
-      <form method="post" action="{% url 'roadmap:objective_delete' objective.pk %}" style="margin:0;"
-            onsubmit="return confirm('Delete this objective and all its key results? This cannot be undone.');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-ghost" style="color:var(--priority-critical);">Delete objective</button>
-      </form>
-      {% if objective.archived %}<span style="font-size:12px; color:var(--accent-gold);">Archived — hidden from roadmaps and lists, kept for reference.</span>{% endif %}
-    </div>
-  {% endif %}
 </div>
 
 <script>
@@ -89,11 +88,53 @@
     document.getElementById('kr-forms').insertAdjacentHTML('beforeend', html);
     total.value = index + 1;
   }
+  // ── Key-result kebab menu: Archive / Delete ──
+  function closeKrMenus(except) {
+    document.querySelectorAll('.kr-menu__list').forEach((m) => { if (m !== except) m.hidden = true; });
+  }
+  function toggleKrMenu(btn) {
+    const list = btn.parentElement.querySelector('.kr-menu__list');
+    const show = list.hidden;
+    closeKrMenus(show ? list : null);
+    list.hidden = !show;
+  }
+  function syncKrArchivedState(formEl) {
+    const cb = formEl.querySelector('.kr-archived-field input[type=checkbox]');
+    const on = !!(cb && cb.checked);
+    const banner = formEl.querySelector('.kr-archived-banner');
+    const item = formEl.querySelector('.kr-menu__archive');
+    if (banner) banner.hidden = !on;
+    if (item) item.textContent = on ? 'Unarchive' : 'Archive';
+    formEl.style.opacity = on ? '0.6' : '';
+  }
+  function toggleKrArchive(btn) {
+    const formEl = btn.closest('.kr-form');
+    const cb = formEl.querySelector('.kr-archived-field input[type=checkbox]');
+    if (cb) cb.checked = !cb.checked;        // applied on Save; hidden from timeline/lists
+    syncKrArchivedState(formEl);
+    closeKrMenus(null);
+  }
+  function deleteKrFromMenu(btn) {
+    removeKrForm(btn);
+    closeKrMenus(null);
+  }
   function removeKrForm(btn) {
     const formEl = btn.closest('.kr-form');
     const del = formEl.querySelector('input[type=checkbox][name$="-DELETE"]');
     if (del) del.checked = true;            // saved rows: mark for deletion on save
     formEl.style.display = 'none';          // new rows: just hide (empty ⇒ ignored)
+  }
+  // Reflect any already-archived key results on load; close menus on outside click.
+  document.querySelectorAll('.kr-form').forEach(syncKrArchivedState);
+  document.addEventListener('click', (e) => { if (!e.target.closest('.kr-menu')) closeKrMenus(null); });
+
+  // Double confirmation before permanently deleting the objective.
+  function confirmDeleteObjective(name) {
+    if (!confirm('Delete “' + name + '” and all its key results? This cannot be undone.')) return false;
+    const typed = prompt('This is permanent. Type the objective name to confirm deletion:\n\n' + name);
+    if (typed === null) return false;
+    if (typed.trim() !== name) { alert('That didn’t match the objective name — deletion cancelled.'); return false; }
+    return true;
   }
 
   // Reuse picker: when an existing objective is chosen, the title/description

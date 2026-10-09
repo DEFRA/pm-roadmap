@@ -2,14 +2,22 @@
 {% for hidden in kr.hidden_fields %}{{ hidden }}{% endfor %}
 {% if kr.non_field_errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.non_field_errors }}</div>{% endif %}
 
-<button type="button" class="kr-remove no-export" onclick="removeKrForm(this)"
-        title="Delete this key result" aria-label="Delete this key result"
-        style="position:absolute; top:6px; right:6px; width:22px; height:22px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-main); color:var(--text-muted); cursor:pointer; line-height:1;">&times;</button>
+{# Row actions: a kebab (⋮) menu offering Archive / Delete for this key result. #}
+<div class="kr-menu no-export" style="position:absolute; top:6px; right:6px;">
+  <button type="button" onclick="toggleKrMenu(this)" title="Key result actions" aria-label="Key result actions"
+          style="width:24px; height:24px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-main); color:var(--text-muted); cursor:pointer; line-height:1; font-size:15px; padding:0;">&#8942;</button>
+  <div class="kr-menu__list" hidden
+       style="position:absolute; top:100%; right:0; margin-top:4px; z-index:20; min-width:150px; background:var(--surface,#fff); border:1px solid var(--border-subtle); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.15); padding:4px;">
+    <button type="button" class="kr-menu__archive" onclick="toggleKrArchive(this)"
+            style="display:block; width:100%; text-align:left; background:none; border:none; padding:6px 10px; font-size:13px; color:var(--text-main); cursor:pointer; border-radius:4px;">Archive</button>
+    <button type="button" onclick="deleteKrFromMenu(this)"
+            style="display:block; width:100%; text-align:left; background:none; border:none; padding:6px 10px; font-size:13px; color:var(--priority-critical); cursor:pointer; border-radius:4px;">Delete</button>
+  </div>
+</div>
 
-{# Archive hides the KR but keeps it (reversible); the × above deletes it on Save. #}
-<label class="no-export" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); margin-bottom:0.5rem; cursor:pointer;">
-  {{ kr.archived }} Archived (hidden from the timeline, kept for reference)
-</label>
+{# Archived flag is set via the kebab menu above; the checkbox stays hidden. #}
+<span class="kr-archived-field" style="display:none;">{{ kr.archived }}</span>
+<div class="kr-archived-banner" hidden style="font-size:11px; color:var(--accent-gold); font-weight:600; margin-bottom:0.5rem;">Archived — hidden from the timeline, kept for reference.</div>
 
 {# Set/timeframe this key result belongs to — one objective can carry different KRs across sets. #}
 <div style="margin-bottom:0.5rem;">
