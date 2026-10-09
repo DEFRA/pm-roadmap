@@ -131,6 +131,20 @@ class RoadmapApiTests(ApiTestCase):
         res = self.put(f'/api/roadmaps/{self.group.pk}/', {'tags': [999999]})
         self.assertEqual(res.status_code, 400)
 
+    def test_archive_and_unarchive_roadmap(self):
+        res = self.put(f'/api/roadmaps/{self.group.pk}/', {'archived': True})
+        self.assertEqual(res.status_code, 200)
+        self.group.refresh_from_db()
+        self.assertTrue(self.group.archived)
+        self.put(f'/api/roadmaps/{self.group.pk}/', {'archived': False})
+        self.group.refresh_from_db()
+        self.assertFalse(self.group.archived)
+
+    def test_delete_roadmap(self):
+        res = self.client.delete(f'/api/roadmaps/{self.group.pk}/')
+        self.assertEqual(res.status_code, 204)
+        self.assertFalse(Roadmap.objects.filter(pk=self.group.pk).exists())
+
 
 class ItemApiTests(ApiTestCase):
     def test_create_item(self):

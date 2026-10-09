@@ -240,6 +240,8 @@ def _apply_roadmap_fields(roadmap, data):
         roadmap.vision = data['vision'] or ''
     if 'roadmap_type' in data and data['roadmap_type'] in dict(Roadmap.ROADMAP_TYPE_CHOICES):
         roadmap.roadmap_type = data['roadmap_type']
+    if 'archived' in data:
+        roadmap.archived = bool(data['archived'])
 
 
 @require_http_methods(['POST'])

@@ -209,9 +209,15 @@
         <textarea x-model="roadmapForm.description" rows="2" class="form-input"></textarea>
       </div>
 
-      <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+      <div style="display:flex; gap:0.5rem; margin-top:1rem; align-items:center;">
         <button type="button" class="btn btn-primary" @click="saveEditRoadmap()">Save</button>
         <button type="button" class="btn btn-ghost" @click="closeEditRoadmap()">Cancel</button>
+        <span style="flex:1;"></span>
+        {# Archive hides it from the active list but keeps everything; delete is permanent. #}
+        <button type="button" class="btn btn-ghost" @click="toggleArchiveRoadmap()"
+                x-text="roadmap.archived ? 'Unarchive' : 'Archive'"></button>
+        <button type="button" class="btn btn-ghost" @click="deleteRoadmap()"
+                style="color:var(--priority-critical);">Delete</button>
       </div>
     </div>
   </div>

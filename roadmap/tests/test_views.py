@@ -218,6 +218,13 @@ class ListViewTests(TestCase):
         self.assertIn('roadmaps_json', res.context)
         self.assertIn('organisations', res.context)
 
+    def test_list_json_carries_archived_flag(self):
+        import json
+        Roadmap.objects.create(name='Old', archived=True)
+        data = {r['name']: r['archived'] for r in json.loads(self.client.get('/roadmaps/').context['roadmaps_json'])}
+        self.assertTrue(data['Old'])
+        self.assertFalse(data['Alpha'])   # archived defaults false
+
     def test_root_redirects_to_teams(self):
         res = self.client.get('/')
         self.assertRedirects(res, '/teams/', fetch_redirect_response=False)

@@ -25,6 +25,7 @@ def roadmap_list(request):
             'created': r.created_at.strftime('%d %b %Y'),
             'org_ids': [o.pk for o in r.organisations.all()],
             'org_badges': [o.abbreviation or o.name for o in r.organisations.all()],
+            'archived': r.archived,
         }
         for r in roadmaps
     ]
@@ -499,6 +500,7 @@ def roadmap_detail(request, pk):
             'roadmap_type': roadmap.roadmap_type,
             'roadmap_type_display': roadmap.get_roadmap_type_display(),
             'organisations': [o.pk for o in roadmap.organisations.all()],
+            'archived': roadmap.archived,
         }),
         'organisations': Organisation.objects.all(),
         'tag_data_json': json.dumps({
