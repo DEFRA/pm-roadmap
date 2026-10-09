@@ -34,5 +34,5 @@ def reverse(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [('roadmap', '0028_objective_sets_m2m')]
+    dependencies = [('roadmap', '0029_objective_sets_m2m')]
     operations = [migrations.RunPython(forward, reverse)]

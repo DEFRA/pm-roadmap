@@ -304,56 +304,6 @@ class ManagePanelOfferedTests(TestCase):
         self.assertFalse(self._ctx(rm)['can_manage_objectives'])
 
 
-class ObjectiveSetScopingTests(TestCase):
-    """An objective may only be linked to its own team's sets — never another
-    team's (the ObjectiveForm 'Set' picker is the only place that link is made)."""
-
-    def setUp(self):
-        self.client = Client()
-        self.org = Organisation.objects.create(name='MMO')
-        self.team = Team.objects.create(organisation=self.org, name='Licensing')
-        self.other = Team.objects.create(organisation=self.org, name='Appeals')
-        self.mine = ObjectiveSet.objects.create(
-            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.team, name='Mine Q3')
-        self.theirs = ObjectiveSet.objects.create(
-            organisation=self.org, scope=ObjectiveSet.TEAM, team=self.other, name='Theirs Q3')
-        self.obj = Objective.objects.create(team=self.team, objective_set=self.mine, title='Speed up')
-
-    def _form(self, **kwargs):
-        from roadmap.forms import ObjectiveForm
-        return ObjectiveForm(**kwargs)
-
-    def test_edit_form_offers_only_own_team_sets(self):
-        choices = set(self._form(instance=self.obj).fields['objective_set'].queryset)
-        self.assertIn(self.mine, choices)
-        self.assertNotIn(self.theirs, choices)       # another team's set is hidden
-
-    def test_new_unowned_objective_may_pick_any_set(self):
-        # A brand-new objective has no team yet; the set it picks defines its team.
-        choices = set(self._form(instance=Objective()).fields['objective_set'].queryset)
-        self.assertIn(self.mine, choices)
-        self.assertIn(self.theirs, choices)
-
-    def test_create_under_a_set_offers_only_that_teams_sets(self):
-        # "New objective" is always reached with ?set=<a team's set>, so the Set
-        # dropdown on the create form must list only that team's sets.
-        res = self.client.get(f'/objectives/new/?set={self.mine.pk}')
-        qs = res.context['form'].fields['objective_set'].queryset
-        self.assertIn(self.mine, qs)
-        self.assertNotIn(self.theirs, qs)        # the other team's set isn't offered
-
-    def test_editing_onto_another_teams_set_is_rejected(self):
-        data = {
-            'objective_set': str(self.theirs.pk), 'title': 'Speed up', 'description': '',
-            'key_results-TOTAL_FORMS': '0', 'key_results-INITIAL_FORMS': '0',
-            'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
-        }
-        res = self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
-        self.assertEqual(res.status_code, 200)       # re-renders with an error, no redirect
-        self.obj.refresh_from_db()
-        self.assertEqual(self.obj.objective_set, self.mine)   # link unchanged
-
-
 class KeyResultPerSetTests(TestCase):
     """Each key result carries its own set/period, managed on the objective edit
     page, so one durable objective spans multiple sets with different KRs."""

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('roadmap', '0027_item_key_results'),
+        ('roadmap', '0028_roadmap_archived'),
     ]
 
     operations = [
