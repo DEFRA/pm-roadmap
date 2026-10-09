@@ -62,17 +62,18 @@ def roadmap_objective_ids(roadmap):
     sync_okrs toggle gates the team/group sourcing.
     """
     ids = set(roadmap.objectives.values_list('pk', flat=True))
-    if not roadmap.sync_okrs:
-        return ids
-    if roadmap.owning_team_id:
+    if roadmap.sync_okrs and roadmap.owning_team_id:
         team_obj_ids = set(
             Objective.objects.filter(team_id=roadmap.owning_team_id).values_list('pk', flat=True)
         )
         hidden = set(roadmap.hidden_objectives.values_list('pk', flat=True))
         ids.update(team_obj_ids - hidden)
-    else:
+    elif roadmap.sync_okrs:
         for obj_set in linkable_sets(roadmap).prefetch_related('member_objectives'):
             ids.update(o.pk for o in obj_set.member_objectives.all())
+    # Archived objectives never appear on a roadmap — hidden everywhere, kept for reference.
+    if ids:
+        ids = set(Objective.objects.filter(pk__in=ids, archived=False).values_list('pk', flat=True))
     return ids
 
 

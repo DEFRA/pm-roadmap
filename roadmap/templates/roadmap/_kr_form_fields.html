@@ -3,8 +3,14 @@
 {% if kr.non_field_errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.non_field_errors }}</div>{% endif %}
 
 <button type="button" class="kr-remove no-export" onclick="removeKrForm(this)"
-        title="Remove this key result" aria-label="Remove this key result"
+        title="Delete this key result" aria-label="Delete this key result"
         style="position:absolute; top:6px; right:6px; width:22px; height:22px; border:1px solid var(--border-subtle); border-radius:6px; background:var(--bg-main); color:var(--text-muted); cursor:pointer; line-height:1;">&times;</button>
+
+{# Archive keeps the key result but hides it from the timeline and lists (reversible);
+   the × above deletes it for good on Save. #}
+<label class="no-export" style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); margin-bottom:0.5rem; cursor:pointer;">
+  {{ kr.archived }} Archived (hidden from the timeline, kept for reference)
+</label>
 
 {# Set/timeframe this key result belongs to — one objective can carry different KRs across sets. #}
 <div style="margin-bottom:0.5rem;">

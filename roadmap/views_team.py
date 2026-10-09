@@ -30,20 +30,21 @@ def team_home(request, pk):
     team = get_object_or_404(Team.objects.select_related('organisation'), pk=pk)
     team_sets = list(
         ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=False)
-        .prefetch_related('member_objectives__key_results', 'key_results')
+        .prefetch_related('member_objectives__key_results', 'key_results__objective')
     )
     archived_sets = list(
         ObjectiveSet.objects.filter(scope=ObjectiveSet.TEAM, team=team, archived=True)
-        .prefetch_related('member_objectives', 'key_results')
+        .prefetch_related('member_objectives', 'key_results__objective')
     )
 
     # Durable objectives (B2): a set's objectives are those with a key result in
-    # this period (kr.objective_set) plus any still linked by the deprecated
-    # Objective.objective_set — so a reused objective counts under each set it
-    # carries KRs in, not only its original one.
+    # this period (kr.objective_set) plus any still linked as a member — counting
+    # each reused objective under every set it carries KRs in. Archived objectives
+    # and archived key results are kept for reference but not counted.
     def _durable_count(s):
-        ids = {kr.objective_id for kr in s.key_results.all()}
-        ids |= {o.pk for o in s.member_objectives.all()}
+        ids = {kr.objective_id for kr in s.key_results.all()
+               if not kr.archived and not kr.objective.archived}
+        ids |= {o.pk for o in s.member_objectives.all() if not o.archived}
         return len(ids)
     for s in team_sets + archived_sets:
         s.durable_objective_count = _durable_count(s)

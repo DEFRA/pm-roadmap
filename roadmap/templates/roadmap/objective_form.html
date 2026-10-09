@@ -62,6 +62,23 @@
       <a href="{% if objective %}{% url 'roadmap:objective_detail' objective.pk %}{% elif objective_set %}{% url 'roadmap:objective_set_detail' objective_set.pk %}{% else %}{% url 'roadmap:objective_list' %}{% endif %}" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
+
+  {% if objective %}
+    {# Archive / delete the whole objective — separate POSTs (can't nest in the form above). #}
+    <div style="display:flex; gap:8px; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--border-subtle); align-items:center; flex-wrap:wrap;">
+      <form method="post" style="margin:0;"
+            action="{% if objective.archived %}{% url 'roadmap:objective_unarchive' objective.pk %}{% else %}{% url 'roadmap:objective_archive' objective.pk %}{% endif %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost">{% if objective.archived %}Unarchive objective{% else %}Archive objective{% endif %}</button>
+      </form>
+      <form method="post" action="{% url 'roadmap:objective_delete' objective.pk %}" style="margin:0;"
+            onsubmit="return confirm('Delete this objective and all its key results? This cannot be undone.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost" style="color:var(--priority-critical);">Delete objective</button>
+      </form>
+      {% if objective.archived %}<span style="font-size:12px; color:var(--accent-gold);">Archived — hidden from roadmaps and lists, kept for reference.</span>{% endif %}
+    </div>
+  {% endif %}
 </div>
 
 <script>

@@ -360,7 +360,7 @@ def roadmap_detail(request, pk):
     if roadmap.sync_okrs and roadmap.owning_team_id:
         # Synced team roadmap: manage the whole team's durable objectives.
         manage_objectives = list(
-            Objective.objects.filter(team_id=roadmap.owning_team_id).order_by('sort_order', 'title')
+            Objective.objects.filter(team_id=roadmap.owning_team_id, archived=False).order_by('sort_order', 'title')
         )
     else:
         # Teamless or non-synced roadmap: manage its own (directly-linked) objectives.
@@ -854,6 +854,8 @@ def _make_objective_lane(name, objective, obj_items, linkable_set_ids, columns, 
     kr_titles = set()
     if objective is not None:
         for kr in objective.key_results.all():
+            if kr.archived:
+                continue  # archived key results are hidden from the timeline
             has_own_dates = kr.start_date and kr.end_date
             kr_set = kr.objective_set
             if not has_own_dates and (kr_set is None or kr_set.pk not in linkable_set_ids):

@@ -356,6 +356,8 @@ class Objective(models.Model):
     sort_order = models.IntegerField(
         default=0, help_text='Manual swim-lane order on roadmaps (lower = higher up)',
     )
+    archived = models.BooleanField(
+        default=False, help_text='Hidden from roadmap lanes and active lists; kept for reference.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -413,6 +415,8 @@ class KeyResult(models.Model):
         help_text='Manual row in the key-results track (0 = top). Blank = auto-stack.',
     )
     sort_order = models.IntegerField(default=0)
+    archived = models.BooleanField(
+        default=False, help_text='Hidden from the roadmap timeline and active lists; kept for reference.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
