@@ -257,6 +257,47 @@ its migrations, and leave `roadmap` untouched?**
     If something you're about to do can't be undone that cleanly, it belongs in a
     conversation first.
 
+## 10. Data & assets for prototypes
+
+A common first question: *can my prototype have its own database and its own CSS?*
+
+**CSS, templates and static files — yes, keep them fully separate.** These are
+just files served by the one Django process. Put CSS/JS under `static/<name>/…`
+and templates under `<app>/templates/<name>/…` with your own base template.
+Nothing collides as long as you namespace under your app's name and don't
+override roadmap's files (ground rules 2 and 5). No infra involved.
+
+**Database — "your own tables" yes; "your own separate database" has a catch.**
+There are two things people mean:
+
+- **Your own tables, isolated from roadmap's.** This is automatic: every app's
+  models create their own `<app>_<model>` tables in the shared DB. Your prototype
+  never touches `roadmap_*` and roadmap never sees yours. In practice this is the
+  isolation you want, and it's free — this is ground rule 3. **This is the
+  recommended model: share the one SQLite database, keep your own tables.**
+
+- **A genuinely separate database (a second file or server).** Possible in Django
+  (multi-`DATABASES` + a router), but **it won't persist here**, for a reason
+  specific to this app:
+  - The whole app is one SQLite file (`data/db.sqlite3`), and **Litestream
+    replicates only that one path** (see `litestream.yml`).
+  - The CDP container filesystem is **ephemeral** — on every restart/redeploy
+    Litestream restores that one file and nothing else.
+  - So a *second* SQLite file would have its data **silently lost on the next
+    deploy**, and wiring it up would mean editing the shared `DATABASES` setting,
+    which ground rule 6 says to leave alone.
+
+**If a prototype genuinely needs its own datastore** (large data, a different
+shape, real separation), that's a deliberate step to agree with whoever owns the
+CDP tenant — not a solo change. The platform can provision backing services (the
+local compose already wires up MongoDB, Redis and S3/localstack), so the clean
+route is a **CDP-provisioned database the prototype talks to directly**, keeping
+it out of PM-Roadmap's SQLite file and Litestream entirely.
+
+> **In short:** separate CSS/templates — always. Separate *tables* — by default.
+> A separate *persistent* database — only via a CDP-provisioned service agreed
+> with the platform owner; never bolt a second SQLite file onto the shared one.
+
 ---
 
 *Questions → ask in the team channel before changing anything shared (settings,
