@@ -1079,3 +1079,23 @@ def _make_lane(name, item_list, columns, total_v, tag_id=None):
             tracks['metrics'].append(bar)
 
     return _stack_tracks(tracks, parking_by_type, total_v, name, tag_id=tag_id)
+
+
+def onboarding(request):
+    """Render docs/onboarding.md as an in-app page, so the guide is reachable on
+    the deployed site. The repo Markdown file is the single source of truth — this
+    view just converts it to HTML at request time (trusted, first-party content)."""
+    import markdown
+    from django.conf import settings
+
+    path = settings.BASE_DIR / 'docs' / 'onboarding.md'
+    try:
+        text = path.read_text(encoding='utf-8')
+    except OSError:
+        text = '# Onboarding\n\nThe onboarding guide could not be loaded.'
+    content = markdown.markdown(
+        text,
+        extensions=['fenced_code', 'tables', 'sane_lists'],
+        output_format='html5',
+    )
+    return render(request, 'roadmap/onboarding.html', {'content': content})

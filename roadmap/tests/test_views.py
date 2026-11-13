@@ -346,3 +346,16 @@ class TimelineWindowTests(TestCase):
         res = self.client.get(f'/{self.rm.pk}/')
         self.assertEqual(date.fromisoformat(res.context['range_min_iso']).year,
                          date.today().year - 5)
+
+
+class OnboardingPageTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_onboarding_renders_the_repo_markdown(self):
+        res = self.client.get('/onboarding/')
+        self.assertEqual(res.status_code, 200)
+        # The Markdown file is converted to HTML (headings, not raw markdown).
+        self.assertContains(res, 'Ground rules for prototypes')
+        self.assertContains(res, '<h2')
+        self.assertNotContains(res, '## 1. What it is')   # raw markdown should be gone
