@@ -26,6 +26,20 @@
   {% if kr.objective_set.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.objective_set.errors }}</div>{% endif %}
 </div>
 
+{# Own dates — optional. Used when no set is chosen; otherwise they override the set period (same as dragging the bar on the gantt). #}
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.start_date.label }}</label>
+    {{ kr.start_date }}
+    {% if kr.start_date.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.start_date.errors }}</div>{% endif %}
+  </div>
+  <div>
+    <label style="display:block; font-size:12px; color:var(--text-muted); margin-bottom:2px;">{{ kr.end_date.label }}</label>
+    {{ kr.end_date }}
+    {% if kr.end_date.errors %}<div style="font-size:11px; color:var(--priority-critical);">{{ kr.end_date.errors }}</div>{% endif %}
+  </div>
+</div>
+
 {# Title + unit #}
 <div style="display:grid; grid-template-columns:2fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
   <div>
