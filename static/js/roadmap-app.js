@@ -299,7 +299,7 @@ function roadmapApp() {
       const name = (this.itemInputs[tagType] || '').trim();
       if (!name) { alert('Please enter a name'); return; }
       try {
-        const roadmap = (tagType === 'organisation' || tagType === 'objective') ? this.roadmap.id : null;
+        const roadmap = (tagType === 'organisation' || tagType === 'objective' || tagType === 'theme') ? this.roadmap.id : null;
         const tag = await apiFetch('/api/tags/', 'POST', { name, tag_type: tagType, colour: '#595959', roadmap });
         if (!this.itemPool[tagType]) this.itemPool[tagType] = [];
         this.itemPool[tagType].push({ id: tag.id, name: tag.name, colour: tag.colour, tag_type: tag.tag_type });

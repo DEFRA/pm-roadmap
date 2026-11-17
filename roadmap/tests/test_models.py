@@ -28,7 +28,7 @@ class TagScopingTests(TestCase):
         self.assertIsNone(tag.roadmap_id)
 
     def test_scoped_types_constant(self):
-        self.assertEqual(set(Tag.SCOPED_TYPES), {Tag.ORGANISATION, Tag.OBJECTIVE})
+        self.assertEqual(set(Tag.SCOPED_TYPES), {Tag.ORGANISATION, Tag.OBJECTIVE, Tag.THEME})
 
 
 class TagColourTests(TestCase):

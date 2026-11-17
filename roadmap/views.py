@@ -301,6 +301,7 @@ def roadmap_detail(request, pk):
         'organisation': Tag.ORGANISATION,
         'gov_objective': Tag.GOV_OBJECTIVE,
         'objective': Tag.OBJECTIVE,
+        'theme': Tag.THEME,
     }
     if group_by not in tag_type_map and group_by != 'outcome':
         group_by = 'outcome'
@@ -336,6 +337,7 @@ def roadmap_detail(request, pk):
         objective_pool = Tag.objects.filter(tag_type=Tag.GOV_OBJECTIVE, roadmap__isnull=True)
     outcome_pool = Tag.objects.filter(tag_type=Tag.OUTCOME, roadmap__isnull=True)
     org_pool = Tag.objects.filter(tag_type=Tag.ORGANISATION, roadmap=roadmap)
+    theme_pool = Tag.objects.filter(tag_type=Tag.THEME, roadmap=roadmap)
     category_pool = Tag.objects.filter(tag_type=Tag.CATEGORY, roadmap__isnull=True)
 
     # Objective entities on this roadmap (synced sets + directly-linked), for the
@@ -398,6 +400,7 @@ def roadmap_detail(request, pk):
         Tag.GOV_OBJECTIVE: 'Government Objective',
         Tag.OBJECTIVE: 'Objective',
         Tag.ORGANISATION: 'Team',
+        Tag.THEME: 'Theme',
         Tag.CATEGORY: 'Item Category',
     }
 
@@ -423,6 +426,7 @@ def roadmap_detail(request, pk):
         'roadmap_objective_tags': sorted(by_type(objective_type), key=lambda t: t.name),
         'roadmap_outcome_tags': sorted(by_type(Tag.OUTCOME), key=lambda t: t.name),
         'roadmap_org_tags': sorted(by_type(Tag.ORGANISATION), key=lambda t: t.name),
+        'roadmap_theme_tags': sorted(by_type(Tag.THEME), key=lambda t: t.name),
         'roadmap_category_tags': category_pool.filter(items__roadmap=roadmap).distinct().order_by('name'),
         'selected_category_ids': selected_category_ids,
         'selected_categories_str': selected_categories_str,
@@ -480,12 +484,14 @@ def roadmap_detail(request, pk):
             'pools': {
                 'outcome': [tag_min(t) for t in outcome_pool],
                 'organisation': [tag_min(t) for t in org_pool],
+                'theme': [tag_min(t) for t in theme_pool],
             },
             'selected': selected_tag_ids,
         }),
         'item_tag_pools_json': json.dumps({
             'outcome': [tag_min(t) for t in outcome_pool],
             'organisation': [tag_min(t) for t in org_pool],
+            'theme': [tag_min(t) for t in theme_pool],
             'category': [tag_min(t) for t in category_pool],
         }),
         'objective_type_json': json.dumps(objective_type),

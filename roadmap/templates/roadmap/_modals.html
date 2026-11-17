@@ -232,7 +232,8 @@
 
       <template x-for="section in [
           {type: 'outcome', label: 'Defra Outcomes', creatable: false},
-          {type: 'organisation', label: 'Squads', creatable: true}
+          {type: 'organisation', label: 'Squads', creatable: true},
+          {type: 'theme', label: 'Themes', creatable: true}
         ]" :key="section.type">
         <div style="margin-bottom:1.5rem;">
           <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; margin-bottom:10px;" x-text="section.label"></div>
@@ -388,6 +389,7 @@
 
       <template x-for="section in [
           {type: 'organisation', label: 'Squads', creatable: true},
+          {type: 'theme', label: 'Themes', creatable: true},
           {type: 'category', label: 'Item Categories', creatable: true}
         ]" :key="'after-obj-' + section.type">
         <div class="modal-card__section">
