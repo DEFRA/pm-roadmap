@@ -359,3 +359,32 @@ class OnboardingPageTests(TestCase):
         self.assertContains(res, 'Ground rules for prototypes')
         self.assertContains(res, '<h2')
         self.assertNotContains(res, '## 1. What it is')   # raw markdown should be gone
+
+
+class ThemeGroupingTests(TestCase):
+    """Themes are a fourth grouping bucket (a roadmap-scoped tag type), selectable
+    in the gantt's group-by dropdown and shown as swim lanes like Squads/Outcomes."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='RM', roadmap_type=Roadmap.SERVICE)
+        self.theme = Tag.objects.create(name='Sustainability', tag_type=Tag.THEME, roadmap=self.rm)
+        self.rm.tags.add(self.theme)
+        item = Item.objects.create(roadmap=self.rm, item_type=Item.ACTIVITY, title='Green build',
+                                   start_date=date.today(), end_date=date.today() + timedelta(days=30))
+        item.tags.add(self.theme)
+
+    def test_group_by_theme_builds_theme_lanes(self):
+        res = self.client.get(f'/{self.rm.pk}/?group_by=theme')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['group_by'], 'theme')
+        self.assertIn('Sustainability', [l['name'] for l in res.context['lanes']])
+
+    def test_theme_is_a_header_bucket_and_dropdown_option(self):
+        res = self.client.get(f'/{self.rm.pk}/')
+        self.assertEqual([t.name for t in res.context['roadmap_theme_tags']], ['Sustainability'])
+        self.assertContains(res, '<option value="theme"')   # offered in the A1 group-by dropdown
+
+    def test_theme_tag_is_roadmap_scoped(self):
+        self.assertIn(Tag.THEME, Tag.SCOPED_TYPES)
+        self.assertEqual(self.theme.roadmap_id, self.rm.pk)

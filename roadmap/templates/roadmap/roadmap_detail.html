@@ -61,7 +61,7 @@
               title="Manage objectives, outcomes & squads" aria-label="Manage tags"
               style="position:absolute; top:1rem; right:0;">&#9998;</button>
 
-      <div class="roadmap-header__tags" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="roadmap-header__tags" style="grid-template-columns:repeat(4, minmax(0, 1fr));">
         <div class="roadmap-header__tag-group">
           <a href="?group_by={{ objective_type }}&time_scale={{ time_scale }}"
              class="roadmap-header__label roadmap-header__label--link {% if group_by == objective_type %}roadmap-header__label--active{% endif %}">
@@ -179,6 +179,20 @@
             {% endfor %}
           </div>
         </div>
+
+        <div class="roadmap-header__tag-group">
+          <a href="?group_by=theme&time_scale={{ time_scale }}"
+             class="roadmap-header__label roadmap-header__label--link {% if group_by == 'theme' %}roadmap-header__label--active{% endif %}">
+            Themes
+          </a>
+          <div class="roadmap-header__pills">
+            {% for tag in roadmap_theme_tags %}
+              <button type="button" class="tag-pill tag-pill--clickable" style="border-color:{{ tag.colour }}; color:{{ tag.colour }};" @click="openTagModal({{ tag.pk }})">{{ tag.name }}</button>
+            {% empty %}
+              <span style="font-size:12px; color:var(--text-muted);">None yet</span>
+            {% endfor %}
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -288,6 +302,7 @@
           <option value="outcome" {% if group_by == 'outcome' %}selected{% endif %}>Defra Outcomes</option>
           <option value="{{ objective_type }}" {% if group_by == objective_type %}selected{% endif %}>{{ objective_label }}</option>
           <option value="organisation" {% if group_by == 'organisation' %}selected{% endif %}>Squads</option>
+          <option value="theme" {% if group_by == 'theme' %}selected{% endif %}>Themes</option>
         </select>
       </div>
       {% if show_parking %}<div class="gantt-header-parking">Parking lot</div>{% endif %}
@@ -426,7 +441,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=7"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=8"></script>
 <script src="{% static 'js/reorder.js' %}?v=2"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>

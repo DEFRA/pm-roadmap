@@ -73,17 +73,19 @@ class Tag(models.Model):
     OBJECTIVE = 'objective'
     ORGANISATION = 'organisation'
     CATEGORY = 'category'
+    THEME = 'theme'
     TAG_TYPE_CHOICES = [
         (OUTCOME, 'Defra Outcome'),
         (GOV_OBJECTIVE, 'Gov Objective'),
         (OBJECTIVE, 'Objective'),
         (ORGANISATION, 'Squad'),
+        (THEME, 'Theme'),
         (CATEGORY, 'Item Category'),
     ]
-    # Roadmap-scoped types (organisation/Squads, objective/Service objectives) set
-    # this to the owning roadmap. Central types (gov_objective, outcome, category)
-    # leave it null and are shared across all roadmaps.
-    SCOPED_TYPES = (ORGANISATION, OBJECTIVE)
+    # Roadmap-scoped types (organisation/Squads, objective/Service objectives,
+    # theme/Themes) set this to the owning roadmap. Central types (gov_objective,
+    # outcome, category) leave it null and are shared across all roadmaps.
+    SCOPED_TYPES = (ORGANISATION, OBJECTIVE, THEME)
 
     name = models.CharField(max_length=100)
     tag_type = models.CharField(max_length=20, choices=TAG_TYPE_CHOICES)
