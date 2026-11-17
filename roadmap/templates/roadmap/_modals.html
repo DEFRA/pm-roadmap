@@ -302,6 +302,15 @@
             <option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
         </div>
+        <div class="modal-card__section" style="flex:1;">
+          <label class="modal-card__section-label">Confidence</label>
+          <select x-model.number="itemForm.confidence" class="form-input" title="Shades the bar — 99% is full colour">
+            <option :value="25">25%</option>
+            <option :value="50">50%</option>
+            <option :value="75">75%</option>
+            <option :value="99">99%</option>
+          </select>
+        </div>
       </div>
 
       <div class="modal-card__section">

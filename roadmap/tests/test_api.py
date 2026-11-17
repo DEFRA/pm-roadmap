@@ -344,3 +344,25 @@ class CsrfTests(TestCase):
         res = client.post('/api/tags/', data=json.dumps({'name': 'CsrfOk', 'tag_type': 'outcome'}),
                           content_type='application/json', HTTP_X_CSRFTOKEN=token)
         self.assertEqual(res.status_code, 201)
+
+
+class ItemConfidenceTests(ApiTestCase):
+    def test_defaults_to_99(self):
+        res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'Build'})
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(Item.objects.get(title='Build').confidence, 99)
+
+    def test_set_and_update_confidence(self):
+        res = self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'Risky', 'confidence': 25})
+        self.assertEqual(Item.objects.get(title='Risky').confidence, 25)
+        item = Item.objects.get(title='Risky')
+        self.put(f'/api/items/{item.pk}/', {'confidence': 75})
+        item.refresh_from_db()
+        self.assertEqual(item.confidence, 75)
+
+    def test_invalid_confidence_falls_back_to_99(self):
+        self.post(f'/api/roadmaps/{self.group.pk}/items/', {
+            'item_type': 'activity', 'title': 'Weird', 'confidence': 60})
+        self.assertEqual(Item.objects.get(title='Weird').confidence, 99)   # 60 isn't a choice

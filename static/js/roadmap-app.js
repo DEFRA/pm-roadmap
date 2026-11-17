@@ -26,7 +26,7 @@ async function apiFetch(url, method, body) {
 function blankItemForm() {
   return {
     id: null, item_type: 'activity', title: '', description: '',
-    priority: '', size: '', start_date: '', end_date: '',
+    priority: '', size: '', confidence: 99, start_date: '', end_date: '',
     prd_link: '', backlog_link: '', tags: [], linked_activities: [],
     objective: '', key_results: [],
   };
@@ -251,7 +251,7 @@ function roadmapApp() {
       const it = this.activeItem;
       this.itemForm = {
         id: it.id, item_type: it.item_type, title: it.title, description: it.description || '',
-        priority: it.priority || '', size: it.size || '',
+        priority: it.priority || '', size: it.size || '', confidence: it.confidence || 99,
         start_date: this._isoDate(it), end_date: this._isoDateEnd(it),
         prd_link: it.prd_link || '', backlog_link: it.backlog_link || '',
         tags: (it.tags || []).map((t) => t.id),
@@ -312,7 +312,8 @@ function roadmapApp() {
       const payload = {
         item_type: this.itemForm.item_type, title: this.itemForm.title,
         description: this.itemForm.description, priority: this.itemForm.priority,
-        size: this.itemForm.size, start_date: this.itemForm.start_date,
+        size: this.itemForm.size, confidence: this.itemForm.confidence,
+        start_date: this.itemForm.start_date,
         end_date: this.itemForm.end_date, prd_link: this.itemForm.prd_link,
         backlog_link: this.itemForm.backlog_link, tags: this.itemForm.tags,
         linked_activities: this.itemForm.linked_activities,

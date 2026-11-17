@@ -43,6 +43,7 @@ def item_to_dict(i):
         'description': i.description,
         'priority': i.priority,
         'size': i.size,
+        'confidence': i.confidence,
         'start_date': i.start_date.isoformat() if i.start_date else '',
         'end_date': i.end_date.isoformat() if i.end_date else '',
         'row': i.row,
@@ -299,6 +300,12 @@ def _apply_item_fields(item, data):
         item.priority = (data['priority'] or '').lower()
     if 'size' in data:
         item.size = (data['size'] or '').upper()
+    if 'confidence' in data:
+        try:
+            conf = int(data['confidence'])
+        except (TypeError, ValueError):
+            conf = 99
+        item.confidence = conf if conf in dict(Item.CONFIDENCE_CHOICES) else 99
     if 'prd_link' in data:
         item.prd_link = (data['prd_link'] or '').strip()
     if 'backlog_link' in data:

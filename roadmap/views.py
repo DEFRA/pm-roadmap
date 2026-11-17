@@ -944,6 +944,7 @@ def _item_modal_dict(item):
         'priority': item.priority,
         'priority_display': item.get_priority_display() if item.priority else '',
         'size': item.size,
+        'confidence': item.confidence,
         'start_date': item.start_date.strftime('%d %b %Y') if item.start_date else '',
         'end_date': item.end_date.strftime('%d %b %Y') if item.end_date else '',
         '_start_iso': item.start_date.isoformat() if item.start_date else '',
