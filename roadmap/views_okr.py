@@ -192,10 +192,12 @@ def _objective_form(request, objective):
             obj.save()
             form.save_m2m()   # persist the chosen set membership
         # Attach the entered key results to this objective, each on its own set.
+        # A KR with no set and no own dates falls back to the authored period so it
+        # still plots; a KR given its own dates keeps "No set" and uses them.
         kr_set_ids = set()
         for kr in formset.save(commit=False):
             kr.objective = obj
-            if kr.objective_set_id is None:
+            if kr.objective_set_id is None and not (kr.start_date and kr.end_date):
                 kr.objective_set = authored_set
             kr.save()
             if kr.objective_set_id:

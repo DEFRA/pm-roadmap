@@ -373,6 +373,46 @@ class KeyResultPerSetTests(TestCase):
         self.kr.refresh_from_db()
         self.assertEqual(self.kr.objective_set, self.q3)   # unchanged
 
+    def _edit_kr(self, extra):
+        data = {
+            'sets': [self.q3.pk], 'title': 'Speed up', 'description': '',
+            'key_results-TOTAL_FORMS': '1', 'key_results-INITIAL_FORMS': '1',
+            'key_results-MIN_NUM_FORMS': '0', 'key_results-MAX_NUM_FORMS': '1000',
+            'key_results-0-id': str(self.kr.pk), 'key_results-0-title': 'Q3 KR',
+            'key_results-0-start_value': '0', 'key_results-0-target_value': '10',
+            'key_results-0-current_value': '0', 'key_results-0-direction': KeyResult.INCREASE,
+            'key_results-0-status': KeyResult.ON_TRACK,
+        }
+        data.update(extra)
+        return self.client.post(f'/objectives/{self.obj.pk}/edit/', data)
+
+    def test_no_set_with_own_dates_persists_the_dates(self):
+        res = self._edit_kr({
+            'key_results-0-objective_set': '',          # No set (use own dates)
+            'key_results-0-start_date': '2026-02-01',
+            'key_results-0-end_date': '2026-04-30',
+        })
+        self.assertEqual(res.status_code, 302)
+        self.kr.refresh_from_db()
+        self.assertIsNone(self.kr.objective_set_id)      # "No set" respected
+        self.assertEqual(self.kr.start_date, date(2026, 2, 1))
+        self.assertEqual(self.kr.end_date, date(2026, 4, 30))
+
+    def test_no_set_without_dates_falls_back_to_the_authored_period(self):
+        res = self._edit_kr({'key_results-0-objective_set': ''})   # no set, no dates
+        self.assertEqual(res.status_code, 302)
+        self.kr.refresh_from_db()
+        self.assertEqual(self.kr.objective_set, self.q3)  # still plots under the objective's set
+
+    def test_own_dates_must_be_both_or_neither(self):
+        res = self._edit_kr({
+            'key_results-0-objective_set': '',
+            'key_results-0-start_date': '2026-02-01',    # end left blank
+        })
+        self.assertEqual(res.status_code, 200)           # re-rendered with a validation error
+        self.kr.refresh_from_db()
+        self.assertIsNone(self.kr.start_date)            # nothing saved
+
 
 class MultiSetMembershipTests(TestCase):
     """An objective can belong to several sets at once (the top-of-form checkbox
