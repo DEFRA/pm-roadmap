@@ -359,3 +359,22 @@ class OnboardingPageTests(TestCase):
         self.assertContains(res, 'Ground rules for prototypes')
         self.assertContains(res, '<h2')
         self.assertNotContains(res, '## 1. What it is')   # raw markdown should be gone
+
+
+class EmptyRoadmapGanttTests(TestCase):
+    """A brand-new roadmap with no items still shows the gantt timeline scaffold,
+    with an inline prompt to add the first item (not a bare empty-state page)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.rm = Roadmap.objects.create(name='Fresh RM')
+
+    def test_empty_roadmap_renders_the_gantt(self):
+        res = self.client.get(f'/{self.rm.pk}/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.context['lanes'], [])          # genuinely empty
+        self.assertTrue(res.context['months'])              # timeline still built
+        self.assertContains(res, 'gantt-wrapper')           # the chart renders
+        self.assertContains(res, 'gantt-header-months')     # with its timeline header
+        self.assertContains(res, 'Add your first item')     # inline prompt inside it
+        self.assertNotContains(res, 'This roadmap has no items yet')  # old empty-state gone
