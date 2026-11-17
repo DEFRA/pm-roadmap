@@ -166,8 +166,7 @@ def roadmap_tree(request, pk):
 @ensure_csrf_cookie
 def roadmap_detail(request, pk):
     roadmap = get_object_or_404(Roadmap, pk=pk)
-    # Default swimlane view is resolved after the roadmap type is known (below):
-    # group roadmaps default to Defra Outcomes, service roadmaps to Objectives.
+    # Default swimlane view (when none is requested) is resolved below: group by Themes.
     group_by = request.GET.get('group_by')
     time_scale = request.GET.get('time_scale', 'months')
     selected_categories_str = request.GET.get('categories', '')
@@ -291,10 +290,9 @@ def roadmap_detail(request, pk):
     objective_label = 'Objectives' if is_service else 'Gov Objectives'
     objective_creatable = is_service
 
-    # Default view when none is requested: service roadmaps open on Objectives,
-    # group roadmaps on Defra Outcomes.
+    # Default view when none is requested: group by Themes.
     if not group_by:
-        group_by = objective_type if is_service else Tag.OUTCOME
+        group_by = Tag.THEME
 
     # Build swimlanes using the virtual timeline for bar positioning
     tag_type_map = {
@@ -944,6 +942,7 @@ def _item_modal_dict(item):
         'priority': item.priority,
         'priority_display': item.get_priority_display() if item.priority else '',
         'size': item.size,
+        'confidence': item.confidence,
         'start_date': item.start_date.strftime('%d %b %Y') if item.start_date else '',
         'end_date': item.end_date.strftime('%d %b %Y') if item.end_date else '',
         '_start_iso': item.start_date.isoformat() if item.start_date else '',

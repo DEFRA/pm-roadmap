@@ -203,6 +203,15 @@ class Item(models.Model):
         ('XXL', 'XXL'),
     ]
 
+    # Delivery confidence — drives how solid the bar is drawn (99% = full colour,
+    # lower = shaded down).
+    CONFIDENCE_CHOICES = [
+        (25, '25%'),
+        (50, '50%'),
+        (75, '75%'),
+        (99, '99%'),
+    ]
+
     roadmap = models.ForeignKey(Roadmap, on_delete=models.CASCADE, related_name='items')
     # The objective this item belongs to. For metric items (key results) this is
     # the parent objective; assigning it backs the item with a KeyResult (see
@@ -218,6 +227,9 @@ class Item(models.Model):
     # Activity-specific fields
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, blank=True)
     size = models.CharField(max_length=5, choices=SIZE_CHOICES, blank=True)
+    confidence = models.PositiveSmallIntegerField(
+        choices=CONFIDENCE_CHOICES, default=99,
+        help_text='Delivery confidence; shades the bar (99% = full colour).')
     prd_link = models.URLField(blank=True)
     backlog_link = models.URLField(blank=True)
 

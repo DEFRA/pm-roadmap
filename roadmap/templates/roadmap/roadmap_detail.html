@@ -323,7 +323,7 @@
           </div>
           {% for bar in track.bars %}
             {% if bar.item %}
-            <div class="gantt-bar gantt-bar--metric gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
+            <div class="gantt-bar gantt-bar--metric gantt-bar--draggable{% if bar.item.confidence < 99 %} gantt-bar--conf-{{ bar.item.confidence }}{% endif %}" data-item-id="{{ bar.item.pk }}" data-item-type="metric" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}" style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
             {% else %}
             {# Key result — draggable/resizable on the timeline; a click still opens the objective view #}
@@ -349,7 +349,7 @@
         </div>
         {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="milestone" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-milestone-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'milestone' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% for entry in track.parking %}
-            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--milestone gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}{% if entry.item.confidence < 99 %} gantt-bar--conf-{{ entry.item.confidence }}{% endif %}"
                  data-item-id="{{ entry.item.pk }}" data-item-type="milestone" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
                  style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-milestone-row-height) + 4px));"
                  @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
@@ -360,7 +360,7 @@
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-milestone-marker gantt-bar--draggable" data-item-id="{{ bar.item.pk }}" data-item-type="milestone" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="0"
+            <div class="gantt-milestone-marker gantt-bar--draggable{% if bar.item.confidence < 99 %} gantt-bar--conf-{{ bar.item.confidence }}{% endif %}" data-item-id="{{ bar.item.pk }}" data-item-type="milestone" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="0"
                  style="left:{{ bar.left_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-milestone-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})">
               <div class="gantt-milestone-marker__diamond"></div>
@@ -383,7 +383,7 @@
         </div>
         {% if show_parking %}<div class="gantt-parking-lot{% if not track.parking %} gantt-parking-lot--empty{% endif %}" data-lane-key="{{ lane.lane_key }}" data-track="activity" data-zone="parking" style="min-height: calc({{ track.row_count }} * (var(--gantt-row-height) + 4px) + var(--gantt-track-pad) * 2);{% if last_visible_track == 'activity' %} border-bottom:2px solid var(--border-mid);{% endif %}">
           {% for entry in track.parking %}
-            <div class="gantt-bar gantt-bar--activity gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--activity gantt-bar--parking gantt-bar--draggable {% if entry.item.priority %}gantt-bar--priority-{{ entry.item.priority }}{% endif %}{% if entry.item.confidence < 99 %} gantt-bar--conf-{{ entry.item.confidence }}{% endif %}"
                  data-item-id="{{ entry.item.pk }}" data-item-type="activity" data-start="" data-end="" data-row="{{ entry.row }}" data-parked="1"
                  style="top: calc(var(--gantt-track-pad) + {{ entry.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ entry.item.pk }})" title="{{ entry.item.title }}"><span class="gantt-bar__label">{{ entry.item.title }}</span></div>
@@ -394,7 +394,7 @@
             {% for month in months %}<div class="gantt-track__grid-col" style="width:{{ month.width_pct }}%;"></div>{% endfor %}
           </div>
           {% for bar in track.bars %}
-            <div class="gantt-bar gantt-bar--activity gantt-bar--draggable {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}"
+            <div class="gantt-bar gantt-bar--activity gantt-bar--draggable {% if bar.item.priority %}gantt-bar--priority-{{ bar.item.priority }}{% endif %}{% if bar.item.confidence < 99 %} gantt-bar--conf-{{ bar.item.confidence }}{% endif %}"
                  data-item-id="{{ bar.item.pk }}" data-item-type="activity" data-start="{{ bar.item.start_date|date:'Y-m-d' }}" data-end="{{ bar.item.end_date|date:'Y-m-d' }}" data-row="{{ bar.row }}" data-left="{{ bar.left_pct }}" data-width="{{ bar.width_pct }}"
                  style="left:{{ bar.left_pct }}%; width:{{ bar.width_pct }}%; top: calc(var(--gantt-track-pad) + {{ bar.row }} * (var(--gantt-row-height) + 4px));"
                  @click="openModal({{ bar.item.pk }})" title="{{ bar.item.title }}"><span class="gantt-bar__label">{{ bar.item.title }}</span></div>
@@ -443,7 +443,7 @@
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="{% static 'js/export.js' %}"></script>
-<script src="{% static 'js/roadmap-app.js' %}?v=8"></script>
+<script src="{% static 'js/roadmap-app.js' %}?v=9"></script>
 <script src="{% static 'js/reorder.js' %}?v=2"></script>
 <script src="{% static 'js/item-drag.js' %}?v=3"></script>
 <script>

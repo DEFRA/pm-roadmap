@@ -421,6 +421,12 @@ body.gantt-item-resizing * { cursor: ew-resize !important; }
 }
 .gantt-bar--resizing { z-index: 5; }
 
+/* Delivery confidence shades a bar down from its full (99%) colour. Lower
+   confidence = fainter box. Applies to every bar type incl. milestone markers. */
+.gantt-bar--conf-75 { opacity: 0.74; }
+.gantt-bar--conf-50 { opacity: 0.54; }
+.gantt-bar--conf-25 { opacity: 0.34; }
+
 /* Bar label truncates with an ellipsis when the title is wider than the bar.
    min-width:0 lets this flex child shrink below its content width so that
    text-overflow can kick in. */
