@@ -762,10 +762,11 @@ textarea.form-input { resize: vertical; line-height: 1.5; }
   .okr-preset-list { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Key result bars synced from an objective set: same metric colour, but a
-   subtle diagonal stripe + no pointer, to read as a read-only reference. */
+/* Key result bars: same metric colour with a subtle diagonal stripe to tell them
+   apart from plain metric items. They drag and resize like activities (keeping the
+   default grab/resize cursor from .gantt-bar); a plain click still opens the
+   objective. */
 .gantt-bar--kr {
-  cursor: default;
   background-image: repeating-linear-gradient(
     45deg, rgba(255, 255, 255, 0.22) 0 5px, transparent 5px 11px);
 }
