@@ -283,15 +283,7 @@
   }
   </script>
 
-  {# ── No items notice ─────────────────────────────────────────── #}
-  {% if not lanes %}
-    <div class="empty-state">
-      <p>This roadmap has no items yet.</p>
-      <button type="button" class="btn btn-primary no-export" style="margin-top:1rem;" @click="openNewItem()">Add an item</button>
-    </div>
-  {% else %}
-
-  {# ── Gantt chart ─────────────────────────────────────────────── #}
+  {# Gantt chart — always rendered, so a new empty roadmap still shows the timeline. #}
   <div class="gantt-wrapper">
     <div class="gantt{% if show_parking %} gantt--parking{% endif %}"
          {% if today_pct is not None %}data-today-pct="{{ today_pct }}" data-today-label="{{ today_label }}"{% endif %}
@@ -413,9 +405,19 @@
         {% endif %}
         </div>{# end .gantt-lane #}
       {% endfor %}
+
+      {% if not lanes %}
+      {# Empty roadmap: fill the chart body with a prompt instead of a bare grid. #}
+      <div class="gantt-empty no-export" style="grid-column:1 / -1; min-height:150px; border-top:1px solid var(--border-subtle); color:var(--text-muted);">
+        {# Pinned to the left so it stays visible however wide the timeline scrolls. #}
+        <div style="position:sticky; left:0; display:flex; flex-direction:column; align-items:flex-start; gap:0.7rem; padding:2.5rem 1.5rem; max-width:min(100%, 560px);">
+          <p style="margin:0; font-size:14px;">No items on this roadmap yet — the timeline above is ready for your first one.</p>
+          <button type="button" class="btn btn-primary" @click="openNewItem()">Add your first item</button>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
   </div>{# end #roadmap-export #}
 
   {% include "roadmap/_modals.html" %}

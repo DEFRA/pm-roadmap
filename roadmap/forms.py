@@ -226,10 +226,12 @@ def _set_choice_label(s):
 class KeyResultForm(forms.ModelForm):
     class Meta:
         model = KeyResult
-        fields = ['objective_set', 'title', 'unit', 'start_value', 'target_value',
-                  'current_value', 'direction', 'status', 'archived']
+        fields = ['objective_set', 'start_date', 'end_date', 'title', 'unit',
+                  'start_value', 'target_value', 'current_value', 'direction', 'status', 'archived']
         widgets = {
             'objective_set': forms.Select(attrs={'class': 'form-input'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
+            'end_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
             'title': forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Key result'}),
             'unit': forms.TextInput(attrs={'class': 'form-input', 'placeholder': '%, £, users'}),
             'start_value': forms.NumberInput(attrs={'class': 'form-input'}),
@@ -260,6 +262,12 @@ class KeyResultForm(forms.ModelForm):
         # A fresh (extra) row defaults to the set being authored under, if any.
         if default_set is not None and not (self.instance and self.instance.pk):
             field.initial = default_set.pk
+        # Own dates: optional. When set, the KR plots across them instead of the
+        # set period (choose 'No set' to rely on them entirely).
+        for name in ('start_date', 'end_date'):
+            self.fields[name].required = False
+        self.fields['start_date'].label = 'Own start'
+        self.fields['end_date'].label = 'Own end'
 
     def clean(self):
         """Target must sit on the side the direction claims (equal start/target is
@@ -273,6 +281,12 @@ class KeyResultForm(forms.ModelForm):
                 self.add_error('target_value', 'Target must be above the start value when higher is better.')
             elif direction == KeyResult.DECREASE and target > start:
                 self.add_error('target_value', 'Target must be below the start value when lower is better.')
+        # Own dates are both-or-neither, and the end can't precede the start.
+        s_date, e_date = cleaned.get('start_date'), cleaned.get('end_date')
+        if bool(s_date) != bool(e_date):
+            self.add_error('end_date' if s_date else 'start_date', 'Set both own dates, or neither.')
+        elif s_date and e_date and e_date < s_date:
+            self.add_error('end_date', 'The end date can’t be before the start date.')
         return cleaned
 
 
