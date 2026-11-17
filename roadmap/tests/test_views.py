@@ -167,13 +167,13 @@ class DetailContextTests(TestCase):
         ctx = self.client.get(f'/{self.group.pk}/?group_by=nonsense').context
         self.assertEqual(ctx['group_by'], 'outcome')
 
-    def test_group_roadmap_defaults_to_outcome(self):
+    def test_group_roadmap_defaults_to_themes(self):
         ctx = self.client.get(f'/{self.group.pk}/').context
-        self.assertEqual(ctx['group_by'], 'outcome')
+        self.assertEqual(ctx['group_by'], 'theme')
 
-    def test_service_roadmap_defaults_to_objectives(self):
+    def test_service_roadmap_defaults_to_themes(self):
         ctx = self.client.get(f'/{self.service.pk}/').context
-        self.assertEqual(ctx['group_by'], 'objective')
+        self.assertEqual(ctx['group_by'], 'theme')
 
     def test_explicit_group_by_overrides_default_on_service(self):
         ctx = self.client.get(f'/{self.service.pk}/?group_by=outcome').context
