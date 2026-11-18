@@ -4,7 +4,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Team, ProductRequirement
 from .forms import PRDCreateForm, PRDForm
-from .prd_sync import sync_prd_to_roadmaps
+from .prd_sync import reconcile_prd, default_sync_roadmaps
 
 
 def prd_create(request, pk):
@@ -18,7 +18,8 @@ def prd_create(request, pk):
             start_date=form.cleaned_data.get('start_date'),
             end_date=form.cleaned_data.get('end_date'),
         )
-        sync_prd_to_roadmaps(prd)
+        prd.roadmaps.set(default_sync_roadmaps(team))
+        reconcile_prd(prd)
         return redirect('roadmap:prd_detail', pk=team.pk, prd_pk=prd.pk)
     return render(request, 'roadmap/prd_create.html', {'team': team, 'form': form})
 
@@ -52,8 +53,8 @@ def prd_detail(request, pk, prd_pk):
         ProductRequirement.objects.select_related('objective'), pk=prd_pk, team=team)
     form = PRDForm(request.POST or None, instance=prd, team=team)
     if request.method == 'POST' and form.is_valid():
-        form.save()
-        sync_prd_to_roadmaps(prd)
+        form.save()                 # persists the roadmaps selection
+        reconcile_prd(prd)          # add/remove backing activities to match
         return redirect('roadmap:prd_detail', pk=team.pk, prd_pk=prd.pk)
     canvas = [(label, form[name]) for label, name in PRD_FIELDS]
     return render(request, 'roadmap/prd_detail.html', {

@@ -473,6 +473,9 @@ class Experiment(models.Model):
     objective = models.ForeignKey(
         'Objective', on_delete=models.SET_NULL, null=True, blank=True, related_name='experiments',
     )
+    # Roadmaps this canvas is synced onto (shown as an activity on each). Chosen
+    # per-canvas; see roadmap/experiment_sync.py.
+    roadmaps = models.ManyToManyField('Roadmap', blank=True, related_name='synced_experiments')
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     customer = models.TextField(blank=True)
@@ -498,6 +501,8 @@ class ProductRequirement(models.Model):
     Ported from myproduct.pro without the user `owner` field.
     """
     team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='product_requirements')
+    # Roadmaps this canvas is synced onto (chosen per-canvas; see prd_sync.py).
+    roadmaps = models.ManyToManyField('Roadmap', blank=True, related_name='synced_prds')
     name = models.CharField(max_length=200, help_text='Short name for the initiative.')
     title = models.CharField(max_length=200, help_text='Top-line summary of the initiative.')
     start_date = models.DateField(null=True, blank=True, help_text='Estimated start date.')

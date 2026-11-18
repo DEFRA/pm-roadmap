@@ -98,11 +98,11 @@ def team_roadmap_create(request, pk):
         roadmap.save()
         if team.organisation_id:
             roadmap.organisations.add(team.organisation)
-        # Bring the team's existing experiments / PRDs onto the new roadmap.
-        from .experiment_sync import sync_all_experiments_to_roadmap
-        from .prd_sync import sync_all_prds_to_roadmap
-        sync_all_experiments_to_roadmap(roadmap)
-        sync_all_prds_to_roadmap(roadmap)
+        # A new roadmap that opts in picks up the team's existing experiments / PRDs.
+        from .experiment_sync import add_roadmap_to_team_experiments
+        from .prd_sync import add_roadmap_to_team_prds
+        add_roadmap_to_team_experiments(roadmap)
+        add_roadmap_to_team_prds(roadmap)
         return redirect('roadmap:detail', pk=roadmap.pk)
     return render(request, 'roadmap/team_roadmap_form.html', {'form': form, 'team': team})
 

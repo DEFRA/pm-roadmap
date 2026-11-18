@@ -1,13 +1,19 @@
 """Keep team PRDs in step with roadmap activities (see experiment_sync.py)."""
 from .access import objective_assignable_to_roadmap
-from .models import Item, ProductRequirement, Roadmap
+from .models import ProductRequirement, Roadmap
 
 
-def prd_sync_roadmaps(prd):
-    """Team roadmaps that should show this PRD as an activity."""
-    return Roadmap.objects.filter(
-        owning_team_id=prd.team_id, archived=False, sync_prds=True,
-    )
+def team_roadmaps(team):
+    """Non-archived roadmaps owned by the team — the selectable sync targets."""
+    if team is None:
+        return Roadmap.objects.none()
+    return Roadmap.objects.filter(owning_team=team, archived=False).order_by('name')
+
+
+def default_sync_roadmaps(team):
+    """Roadmaps a new PRD syncs to by default: the team's non-archived roadmaps
+    that opt in (Roadmap.sync_prds)."""
+    return team_roadmaps(team).filter(sync_prds=True)
 
 
 def _item_objective_for_roadmap(prd, roadmap):
@@ -20,19 +26,9 @@ def _prd_description(prd):
     return prd.problems or prd.high_level_requirements or ''
 
 
-def prds_not_on_roadmap(roadmap):
-    """Team PRDs that don't yet have an activity on this roadmap."""
-    if not roadmap.owning_team_id:
-        return ProductRequirement.objects.none()
-    return (
-        ProductRequirement.objects.filter(team_id=roadmap.owning_team_id)
-        .exclude(roadmap_items__roadmap=roadmap)
-        .order_by('-created_at')
-    )
-
-
 def sync_prd_to_roadmap(prd, roadmap):
     """Create or update the roadmap activity backing a PRD."""
+    from .models import Item
     item = Item.objects.filter(roadmap=roadmap, product_requirement=prd).first()
     if item is None:
         item = Item(roadmap=roadmap, product_requirement=prd, item_type=Item.ACTIVITY)
@@ -45,17 +41,19 @@ def sync_prd_to_roadmap(prd, roadmap):
     return item
 
 
-def sync_prd_to_roadmaps(prd):
-    for roadmap in prd_sync_roadmaps(prd):
+def reconcile_prd(prd):
+    """Make the backing activities match prd.roadmaps exactly."""
+    selected_ids = set(prd.roadmaps.values_list('pk', flat=True))
+    prd.roadmap_items.exclude(roadmap_id__in=selected_ids).delete()
+    for roadmap in Roadmap.objects.filter(pk__in=selected_ids):
         sync_prd_to_roadmap(prd, roadmap)
 
 
-def sync_all_prds_to_roadmap(roadmap):
-    if not roadmap.sync_prds or not roadmap.owning_team_id:
+def add_roadmap_to_team_prds(roadmap):
+    """When a roadmap is created with sync on, include it on the team's existing
+    PRDs and sync."""
+    if not (roadmap.sync_prds and roadmap.owning_team_id and not roadmap.archived):
         return
     for prd in ProductRequirement.objects.filter(team_id=roadmap.owning_team_id):
+        prd.roadmaps.add(roadmap)
         sync_prd_to_roadmap(prd, roadmap)
-
-
-def remove_synced_prds_from_roadmap(roadmap):
-    roadmap.items.filter(product_requirement__isnull=False).delete()

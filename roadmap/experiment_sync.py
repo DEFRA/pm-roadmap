@@ -1,19 +1,25 @@
 """Keep team experiments in step with roadmap activities.
 
-An experiment can surface as an activity bar on the owning team's roadmaps that
-opt in (Roadmap.sync_experiments). The backing Item links back via Item.experiment;
-saving the experiment creates or updates that Item, deleting the experiment (via
-the FK cascade) removes it.
+Which roadmaps a canvas appears on is chosen per-canvas (Experiment.roadmaps). The
+backing Item links back via Item.experiment; reconciling creates/updates an Item
+on each selected roadmap and removes it from any deselected one. Deleting the
+experiment (FK cascade) removes its activities.
 """
 from .access import objective_assignable_to_roadmap
-from .models import Experiment, Item, Roadmap
+from .models import Experiment, Roadmap
 
 
-def experiment_sync_roadmaps(experiment):
-    """Team roadmaps that should show this experiment as an activity."""
-    return Roadmap.objects.filter(
-        owning_team_id=experiment.team_id, archived=False, sync_experiments=True,
-    )
+def team_roadmaps(team):
+    """Non-archived roadmaps owned by the team — the selectable sync targets."""
+    if team is None:
+        return Roadmap.objects.none()
+    return Roadmap.objects.filter(owning_team=team, archived=False).order_by('name')
+
+
+def default_sync_roadmaps(team):
+    """Roadmaps a new experiment syncs to by default: the team's non-archived
+    roadmaps that opt in (Roadmap.sync_experiments)."""
+    return team_roadmaps(team).filter(sync_experiments=True)
 
 
 def _item_objective_for_roadmap(experiment, roadmap):
@@ -22,19 +28,9 @@ def _item_objective_for_roadmap(experiment, roadmap):
     return None
 
 
-def experiments_not_on_roadmap(roadmap):
-    """Team experiments that don't yet have an activity on this roadmap."""
-    if not roadmap.owning_team_id:
-        return Experiment.objects.none()
-    return (
-        Experiment.objects.filter(team_id=roadmap.owning_team_id)
-        .exclude(roadmap_items__roadmap=roadmap)
-        .order_by('-created_at')
-    )
-
-
 def sync_experiment_to_roadmap(experiment, roadmap):
     """Create or update the roadmap activity backing an experiment."""
+    from .models import Item
     item = Item.objects.filter(roadmap=roadmap, experiment=experiment).first()
     if item is None:
         item = Item(roadmap=roadmap, experiment=experiment, item_type=Item.ACTIVITY)
@@ -47,17 +43,19 @@ def sync_experiment_to_roadmap(experiment, roadmap):
     return item
 
 
-def sync_experiment_to_roadmaps(experiment):
-    for roadmap in experiment_sync_roadmaps(experiment):
+def reconcile_experiment(experiment):
+    """Make the backing activities match experiment.roadmaps exactly."""
+    selected_ids = set(experiment.roadmaps.values_list('pk', flat=True))
+    experiment.roadmap_items.exclude(roadmap_id__in=selected_ids).delete()
+    for roadmap in Roadmap.objects.filter(pk__in=selected_ids):
         sync_experiment_to_roadmap(experiment, roadmap)
 
 
-def sync_all_experiments_to_roadmap(roadmap):
-    if not roadmap.sync_experiments or not roadmap.owning_team_id:
+def add_roadmap_to_team_experiments(roadmap):
+    """When a roadmap is created with sync on, include it on the team's existing
+    experiments and sync."""
+    if not (roadmap.sync_experiments and roadmap.owning_team_id and not roadmap.archived):
         return
     for experiment in Experiment.objects.filter(team_id=roadmap.owning_team_id):
+        experiment.roadmaps.add(roadmap)
         sync_experiment_to_roadmap(experiment, roadmap)
-
-
-def remove_synced_experiments_from_roadmap(roadmap):
-    roadmap.items.filter(experiment__isnull=False).delete()

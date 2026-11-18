@@ -9,6 +9,8 @@
   .canvas .err { font-size:12px; color:var(--priority-critical); margin-top:2px; }
   .canvas .row { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:0.75rem; }
   .canvas .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:0 1.25rem; }
+  .canvas .roadmaps ul { list-style:none; margin:4px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 18px; }
+  .canvas .roadmaps li label { font-weight:400; display:flex; align-items:center; gap:7px; cursor:pointer; font-size:13.5px; }
 </style>
 {% endblock %}
 
@@ -37,6 +39,12 @@
       <div><label>{{ form.objective.label }}</label>{{ form.objective }}</div>
       <div><label>Estimated start</label>{{ form.start_date }}</div>
       <div><label>Estimated end</label>{{ form.end_date }}{% if form.end_date.errors %}<div class="err">{{ form.end_date.errors }}</div>{% endif %}</div>
+    </div>
+
+    <div class="field roadmaps">
+      <label>{{ form.roadmaps.label }}</label>
+      {% if form.roadmaps.field.queryset.exists %}{{ form.roadmaps }}{% else %}<span style="font-size:12px; color:var(--text-muted);">This team has no roadmaps to sync to yet.</span>{% endif %}
+      <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">{{ form.roadmaps.help_text }}</div>
     </div>
 
     <div class="grid">

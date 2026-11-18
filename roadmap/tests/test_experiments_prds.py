@@ -28,7 +28,7 @@ class ExperimentTests(TestCase):
     def test_edit_updates_the_backing_activity(self):
         exp = Experiment.objects.create(team=self.team, title='Old')
         data = {
-            'title': 'New name', 'objective': '',
+            'title': 'New name', 'objective': '', 'roadmaps': [self.rm.pk],
             'start_date': '2026-03-01', 'end_date': '2026-04-01',
             'customer': '', 'segment_size': '', 'hypothesis': 'We believe X',
             'actions': '', 'metric': '', 'line_in_the_sand': '', 'result': '',
@@ -42,7 +42,8 @@ class ExperimentTests(TestCase):
 
     def test_delete_removes_experiment_and_its_activity(self):
         exp = Experiment.objects.create(team=self.team, title='Temp')
-        self.client.post(f'/teams/{self.team.pk}/experiments/{exp.pk}/', {'title': 'Temp', 'objective': ''})
+        self.client.post(f'/teams/{self.team.pk}/experiments/{exp.pk}/',
+                         {'title': 'Temp', 'objective': '', 'roadmaps': [self.rm.pk]})
         self.assertTrue(Item.objects.filter(experiment=exp).exists())      # sync created the item
         res = self.client.post(f'/teams/{self.team.pk}/experiments/{exp.pk}/delete/')
         self.assertEqual(res.status_code, 302)
@@ -78,7 +79,7 @@ class PrdTests(TestCase):
     def test_delete_removes_prd_and_its_activity(self):
         prd = ProductRequirement.objects.create(team=self.team, name='X', title='Y')
         self.client.post(f'/teams/{self.team.pk}/prds/{prd.pk}/', {
-            'name': 'X', 'title': 'Y', 'objective': ''})
+            'name': 'X', 'title': 'Y', 'objective': '', 'roadmaps': [self.rm.pk]})
         self.assertTrue(Item.objects.filter(product_requirement=prd).exists())
         self.client.post(f'/teams/{self.team.pk}/prds/{prd.pk}/delete/')
         self.assertFalse(ProductRequirement.objects.filter(pk=prd.pk).exists())
@@ -98,3 +99,41 @@ class SyncOntoNewRoadmapTests(TestCase):
         rm = Roadmap.objects.get(name='Fresh')
         self.assertTrue(Item.objects.filter(roadmap=rm, experiment=exp).exists())
         self.assertTrue(Item.objects.filter(roadmap=rm, product_requirement=prd).exists())
+
+
+class PerCanvasRoadmapSelectionTests(TestCase):
+    """Each canvas chooses which of the team's roadmaps it syncs to (multi-select)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.org = Organisation.objects.create(name='MMO')
+        self.team = Team.objects.create(organisation=self.org, name='Licensing')
+        self.rm_a = Roadmap.objects.create(name='RM A', owning_team=self.team)
+        self.rm_b = Roadmap.objects.create(name='RM B', owning_team=self.team)
+
+    def _edit(self, exp, roadmap_pks):
+        data = {'title': exp.title, 'objective': '', 'roadmaps': roadmap_pks,
+                'customer': '', 'segment_size': '', 'hypothesis': '', 'actions': '',
+                'metric': '', 'line_in_the_sand': '', 'result': ''}
+        return self.client.post(f'/teams/{self.team.pk}/experiments/{exp.pk}/', data)
+
+    def test_selecting_a_subset_syncs_only_those_roadmaps(self):
+        exp = Experiment.objects.create(team=self.team, title='Just A')
+        self._edit(exp, [self.rm_a.pk])        # only RM A
+        self.assertTrue(Item.objects.filter(experiment=exp, roadmap=self.rm_a).exists())
+        self.assertFalse(Item.objects.filter(experiment=exp, roadmap=self.rm_b).exists())
+
+    def test_deselecting_removes_the_backing_activity(self):
+        exp = Experiment.objects.create(team=self.team, title='Toggle')
+        self._edit(exp, [self.rm_a.pk, self.rm_b.pk])   # both
+        self.assertEqual(Item.objects.filter(experiment=exp).count(), 2)
+        self._edit(exp, [self.rm_b.pk])                 # drop A
+        self.assertFalse(Item.objects.filter(experiment=exp, roadmap=self.rm_a).exists())
+        self.assertTrue(Item.objects.filter(experiment=exp, roadmap=self.rm_b).exists())
+
+    def test_create_defaults_to_opted_in_roadmaps_only(self):
+        self.rm_b.sync_experiments = False
+        self.rm_b.save(update_fields=['sync_experiments'])
+        self.client.post(f'/teams/{self.team.pk}/experiments/new/', {'title': 'Defaulted'})
+        exp = Experiment.objects.get(title='Defaulted')
+        self.assertEqual(set(exp.roadmaps.values_list('pk', flat=True)), {self.rm_a.pk})

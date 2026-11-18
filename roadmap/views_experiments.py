@@ -5,7 +5,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Team, Experiment
 from .forms import ExperimentCreateForm, ExperimentForm
-from .experiment_sync import sync_experiment_to_roadmaps
+from .experiment_sync import reconcile_experiment, default_sync_roadmaps
 
 
 def experiment_create(request, pk):
@@ -13,7 +13,8 @@ def experiment_create(request, pk):
     form = ExperimentCreateForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         experiment = Experiment.objects.create(team=team, title=form.cleaned_data['title'])
-        sync_experiment_to_roadmaps(experiment)
+        experiment.roadmaps.set(default_sync_roadmaps(team))   # default: the team's opted-in roadmaps
+        reconcile_experiment(experiment)
         return redirect('roadmap:experiment_detail', pk=team.pk, experiment_pk=experiment.pk)
     return render(request, 'roadmap/experiment_create.html', {'team': team, 'form': form})
 
@@ -24,8 +25,8 @@ def experiment_detail(request, pk, experiment_pk):
         Experiment.objects.select_related('objective'), pk=experiment_pk, team=team)
     form = ExperimentForm(request.POST or None, instance=experiment, team=team)
     if request.method == 'POST' and form.is_valid():
-        form.save()
-        sync_experiment_to_roadmaps(experiment)
+        form.save()                        # persists the roadmaps selection
+        reconcile_experiment(experiment)   # add/remove backing activities to match
         return redirect('roadmap:experiment_detail', pk=team.pk, experiment_pk=experiment.pk)
     return render(request, 'roadmap/experiment_detail.html', {
         'team': team, 'experiment': experiment, 'form': form,

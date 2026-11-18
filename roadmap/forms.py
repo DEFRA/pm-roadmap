@@ -305,6 +305,21 @@ def _team_objectives(team):
     return Objective.objects.filter(team=team, archived=False).order_by('title')
 
 
+def _init_roadmaps_field(field, team):
+    """The per-canvas 'sync to roadmaps' multi-select, scoped to the team's
+    non-archived roadmaps."""
+    # Set the widget before the queryset: the queryset setter populates the
+    # widget's choices, so a widget swapped in afterwards would render empty.
+    field.widget = forms.CheckboxSelectMultiple()
+    field.queryset = (
+        Roadmap.objects.filter(owning_team=team, archived=False).order_by('name')
+        if team else Roadmap.objects.none()
+    )
+    field.required = False
+    field.label = 'Sync to roadmaps'
+    field.help_text = 'Show this canvas as an activity on the chosen roadmaps.'
+
+
 class ExperimentCreateForm(forms.Form):
     title = forms.CharField(
         max_length=200, label='Title',
@@ -322,7 +337,7 @@ class ExperimentCreateForm(forms.Form):
 class ExperimentForm(forms.ModelForm):
     class Meta:
         model = Experiment
-        fields = ['title', 'objective', 'start_date', 'end_date', 'customer',
+        fields = ['title', 'objective', 'roadmaps', 'start_date', 'end_date', 'customer',
                   'segment_size', 'hypothesis', 'actions', 'metric', 'line_in_the_sand', 'result']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-input'}),
@@ -347,6 +362,7 @@ class ExperimentForm(forms.ModelForm):
         f.label = 'OKR related to'
         f.empty_label = 'Choose from existing OKRs'
         self.fields['actions'].label = 'Experiment'
+        _init_roadmaps_field(self.fields['roadmaps'], team)
 
     def clean(self):
         cleaned = super().clean()
@@ -394,7 +410,7 @@ class PRDCreateForm(forms.Form):
 class PRDForm(forms.ModelForm):
     class Meta:
         model = ProductRequirement
-        fields = ['name', 'title', 'start_date', 'end_date', 'objective', 'requester',
+        fields = ['name', 'title', 'start_date', 'end_date', 'objective', 'roadmaps', 'requester',
                   'stakeholders', 'context', 'genesis', 'user_customer', 'problems',
                   'business_outcomes', 'addressable_market', 'costs', 'revenue_value',
                   'metrics', 'validations', 'high_level_requirements', 'risks',
@@ -415,9 +431,10 @@ class PRDForm(forms.ModelForm):
         f.required = False
         f.label = 'OKR related to'
         f.empty_label = 'Choose from existing OKRs'
+        _init_roadmaps_field(self.fields['roadmaps'], team)
         # Every remaining text field is a canvas textarea.
         for name in self.fields:
-            if name not in ('name', 'title', 'start_date', 'end_date', 'objective'):
+            if name not in ('name', 'title', 'start_date', 'end_date', 'objective', 'roadmaps'):
                 self.fields[name].widget = forms.Textarea(attrs={'class': 'form-input', 'rows': 3})
                 self.fields[name].required = False
 
