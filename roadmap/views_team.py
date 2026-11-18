@@ -1,9 +1,8 @@
 """Team pages.
 
 A Team owns OKRs (objective sets, objectives, key results) and roadmaps. These
-pages list teams and show a team's OKRs + roadmaps. Ported from myproduct.pro's
-team_home, trimmed to the OKR scope: no user members, no experiments/PRDs (out
-of scope), and no authentication.
+pages list teams and show a team's OKRs, roadmaps, experiments and PRDs. Ported
+from myproduct.pro's team_home without user members or authentication.
 """
 import json
 
@@ -54,6 +53,8 @@ def team_home(request, pk):
         'team_sets': team_sets,
         'archived_sets': archived_sets,
         'team_roadmaps': team_roadmaps,
+        'experiments': team.experiments.all(),
+        'prds': team.product_requirements.all(),
     })
 
 
@@ -97,6 +98,11 @@ def team_roadmap_create(request, pk):
         roadmap.save()
         if team.organisation_id:
             roadmap.organisations.add(team.organisation)
+        # Bring the team's existing experiments / PRDs onto the new roadmap.
+        from .experiment_sync import sync_all_experiments_to_roadmap
+        from .prd_sync import sync_all_prds_to_roadmap
+        sync_all_experiments_to_roadmap(roadmap)
+        sync_all_prds_to_roadmap(roadmap)
         return redirect('roadmap:detail', pk=roadmap.pk)
     return render(request, 'roadmap/team_roadmap_form.html', {'form': form, 'team': team})
 

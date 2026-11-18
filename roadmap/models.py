@@ -155,6 +155,9 @@ class Roadmap(models.Model):
     # When true, the owning team's (or, for teamless roadmaps, the org's) objective
     # sets surface as swim lanes on this roadmap. See roadmap/access.py.
     sync_okrs = models.BooleanField(default=True)
+    # When true, the owning team's experiments / PRDs appear as activities here.
+    sync_experiments = models.BooleanField(default=True)
+    sync_prds = models.BooleanField(default=True)
     # Objective sets explicitly linked to this roadmap (in addition to synced ones).
     objective_sets = models.ManyToManyField('ObjectiveSet', blank=True, related_name='roadmaps')
     # Standalone objectives (not in a set) attached directly to this roadmap.
@@ -213,6 +216,14 @@ class Item(models.Model):
     ]
 
     roadmap = models.ForeignKey(Roadmap, on_delete=models.CASCADE, related_name='items')
+    # When set, this activity is kept in step with a team experiment / PRD canvas
+    # (see roadmap/experiment_sync.py, prd_sync.py). Deleting the canvas removes it.
+    experiment = models.ForeignKey(
+        'Experiment', on_delete=models.CASCADE, null=True, blank=True, related_name='roadmap_items',
+    )
+    product_requirement = models.ForeignKey(
+        'ProductRequirement', on_delete=models.CASCADE, null=True, blank=True, related_name='roadmap_items',
+    )
     # The objective this item belongs to. For metric items (key results) this is
     # the parent objective; assigning it backs the item with a KeyResult (see
     # roadmap/api.py _ensure_key_result). SET_NULL so items survive objective deletion.
@@ -449,3 +460,74 @@ class KeyResult(models.Model):
             return 100 if self.current_value == self.target_value else 0
         pct = (self.current_value - self.start_value) / span * 100
         return max(0, min(100, round(float(pct))))
+
+
+class Experiment(models.Model):
+    """A team experiment canvas — hypothesis, test plan, and recorded result.
+
+    Ported from myproduct.pro without the user `owner` field (pm-roadmap has no
+    auth). Optionally synced onto the team's roadmaps as an activity.
+    """
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='experiments')
+    title = models.CharField(max_length=200)
+    objective = models.ForeignKey(
+        'Objective', on_delete=models.SET_NULL, null=True, blank=True, related_name='experiments',
+    )
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    customer = models.TextField(blank=True)
+    segment_size = models.TextField(blank=True)
+    hypothesis = models.TextField(blank=True)
+    actions = models.TextField(blank=True, help_text='Actions taken to test the hypothesis.')
+    metric = models.TextField(blank=True)
+    line_in_the_sand = models.TextField(blank=True)
+    result = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class ProductRequirement(models.Model):
+    """Team PRD one-pager — discovery canvas for an epic or feature.
+
+    Ported from myproduct.pro without the user `owner` field.
+    """
+    team = models.ForeignKey('Team', on_delete=models.CASCADE, related_name='product_requirements')
+    name = models.CharField(max_length=200, help_text='Short name for the initiative.')
+    title = models.CharField(max_length=200, help_text='Top-line summary of the initiative.')
+    start_date = models.DateField(null=True, blank=True, help_text='Estimated start date.')
+    end_date = models.DateField(null=True, blank=True, help_text='Estimated end date.')
+    requester = models.TextField(blank=True)
+    stakeholders = models.TextField(blank=True)
+    context = models.TextField(blank=True)
+    genesis = models.TextField(blank=True, help_text='What was the genesis of the idea?')
+    user_customer = models.TextField(blank=True)
+    problems = models.TextField(blank=True, help_text='Problems to be solved / job to be done.')
+    business_outcomes = models.TextField(blank=True)
+    objective = models.ForeignKey(
+        'Objective', on_delete=models.SET_NULL, null=True, blank=True, related_name='product_requirements',
+    )
+    addressable_market = models.TextField(blank=True)
+    costs = models.TextField(blank=True)
+    revenue_value = models.TextField(blank=True)
+    metrics = models.TextField(blank=True)
+    validations = models.TextField(blank=True)
+    high_level_requirements = models.TextField(blank=True)
+    risks = models.TextField(blank=True)
+    assumptions = models.TextField(blank=True)
+    possible_solutions = models.TextField(blank=True)
+    affected_services = models.TextField(blank=True)
+    decision_log = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name

@@ -6,6 +6,7 @@ from django.contrib import messages
 
 from .models import (
     Tag, Roadmap, Item, Organisation, Team, ObjectiveSet, Objective, KeyResult,
+    Experiment, ProductRequirement,
 )
 from .importers import import_items, build_template_workbook
 
@@ -177,3 +178,17 @@ class ObjectiveAdmin(admin.ModelAdmin):
     search_fields = ['title', 'description']
     filter_horizontal = ['sets']
     inlines = [KeyResultInline]
+
+
+@admin.register(Experiment)
+class ExperimentAdmin(admin.ModelAdmin):
+    list_display = ['title', 'team', 'objective', 'start_date', 'end_date', 'updated_at']
+    list_filter = ['team']
+    search_fields = ['title', 'hypothesis']
+
+
+@admin.register(ProductRequirement)
+class ProductRequirementAdmin(admin.ModelAdmin):
+    list_display = ['name', 'team', 'objective', 'start_date', 'end_date', 'updated_at']
+    list_filter = ['team']
+    search_fields = ['name', 'title', 'problems']

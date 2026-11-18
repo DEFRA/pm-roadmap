@@ -86,5 +86,33 @@
       </div>
     {% endfor %}
   {% endif %}
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
+    <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0;">Experiments</h2>
+    <a href="{% url 'roadmap:experiment_create' team.pk %}" class="btn btn-ghost" style="font-size:12px;">+ New experiment</a>
+  </div>
+  <p style="font-size:12px; color:var(--text-muted); margin:0.25rem 0 0;">Hypothesis-driven tests. Each appears as an activity on the team's roadmaps.</p>
+  {% for e in experiments %}
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem;">
+      <a href="{% url 'roadmap:experiment_detail' team.pk e.pk %}" style="font-weight:600;">{{ e.title }}</a>
+      {% if e.start_date or e.end_date %}<div style="font-size:12px; color:var(--text-muted); margin-top:4px;">{{ e.start_date|date:'d M Y'|default:'—' }} → {{ e.end_date|date:'d M Y'|default:'—' }}</div>{% endif %}
+    </div>
+  {% empty %}
+    <p style="color:var(--text-muted);">No experiments yet.</p>
+  {% endfor %}
+
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:1.5rem;">
+    <h2 style="font-size:15px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:0;">PRDs</h2>
+    <a href="{% url 'roadmap:prd_create' team.pk %}" class="btn btn-ghost" style="font-size:12px;">+ New PRD</a>
+  </div>
+  <p style="font-size:12px; color:var(--text-muted); margin:0.25rem 0 0;">Discovery one-pagers. Each appears as an activity on the team's roadmaps.</p>
+  {% for p in prds %}
+    <div style="border:1px solid var(--border-subtle); border-radius:8px; padding:0.75rem 1rem; margin-top:0.5rem;">
+      <a href="{% url 'roadmap:prd_detail' team.pk p.pk %}" style="font-weight:600;">{{ p.name }}</a>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">{{ p.title }}</div>
+    </div>
+  {% empty %}
+    <p style="color:var(--text-muted);">No PRDs yet.</p>
+  {% endfor %}
 </div>
 {% endblock %}

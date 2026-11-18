@@ -8,7 +8,10 @@ from django import forms
 from django.db.models import Q
 from django.forms import inlineformset_factory
 
-from .models import Objective, ObjectiveSet, KeyResult, Team, Organisation, Roadmap
+from .models import (
+    Objective, ObjectiveSet, KeyResult, Team, Organisation, Roadmap,
+    Experiment, ProductRequirement,
+)
 from . import okr_periods
 
 
@@ -293,3 +296,134 @@ class KeyResultForm(forms.ModelForm):
 KeyResultFormSet = inlineformset_factory(
     Objective, KeyResult, form=KeyResultForm, extra=2, can_delete=True,
 )
+
+
+def _team_objectives(team):
+    """A team's durable objectives, for the canvas 'OKR related to' picker."""
+    if team is None:
+        return Objective.objects.none()
+    return Objective.objects.filter(team=team, archived=False).order_by('title')
+
+
+class ExperimentCreateForm(forms.Form):
+    title = forms.CharField(
+        max_length=200, label='Title',
+        widget=forms.TextInput(attrs={'class': 'form-input',
+                                      'placeholder': 'What should we call the experiment?'}),
+    )
+
+    def clean_title(self):
+        title = (self.cleaned_data['title'] or '').strip()
+        if not title:
+            raise forms.ValidationError('Title is required.')
+        return title
+
+
+class ExperimentForm(forms.ModelForm):
+    class Meta:
+        model = Experiment
+        fields = ['title', 'objective', 'start_date', 'end_date', 'customer',
+                  'segment_size', 'hypothesis', 'actions', 'metric', 'line_in_the_sand', 'result']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-input'}),
+            'objective': forms.Select(attrs={'class': 'form-input'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
+            'end_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
+            'customer': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+            'segment_size': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
+            'hypothesis': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+            'actions': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+            'metric': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+            'line_in_the_sand': forms.Textarea(attrs={'class': 'form-input', 'rows': 2}),
+            'result': forms.Textarea(attrs={'class': 'form-input', 'rows': 3}),
+        }
+
+    def __init__(self, *args, team=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._team = team
+        f = self.fields['objective']
+        f.queryset = _team_objectives(team)
+        f.required = False
+        f.label = 'OKR related to'
+        f.empty_label = 'Choose from existing OKRs'
+        self.fields['actions'].label = 'Experiment'
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end and end < start:
+            self.add_error('end_date', 'End date must be after the start date.')
+        return cleaned
+
+
+class PRDCreateForm(forms.Form):
+    name = forms.CharField(
+        max_length=200, label='Initiative name',
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'e.g. Checkout improvements'}),
+    )
+    title = forms.CharField(
+        max_length=200, label='Top line summary',
+        widget=forms.TextInput(attrs={'class': 'form-input',
+                                      'placeholder': 'A succinct summary of the initiative'}),
+    )
+    start_date = forms.DateField(required=False, label='Estimated start',
+                                 widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}))
+    end_date = forms.DateField(required=False, label='Estimated end',
+                               widget=forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}))
+
+    def clean_name(self):
+        name = (self.cleaned_data['name'] or '').strip()
+        if not name:
+            raise forms.ValidationError('Initiative name is required.')
+        return name
+
+    def clean_title(self):
+        title = (self.cleaned_data['title'] or '').strip()
+        if not title:
+            raise forms.ValidationError('Summary is required.')
+        return title
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end and end < start:
+            self.add_error('end_date', 'End date must be after the start date.')
+        return cleaned
+
+
+class PRDForm(forms.ModelForm):
+    class Meta:
+        model = ProductRequirement
+        fields = ['name', 'title', 'start_date', 'end_date', 'objective', 'requester',
+                  'stakeholders', 'context', 'genesis', 'user_customer', 'problems',
+                  'business_outcomes', 'addressable_market', 'costs', 'revenue_value',
+                  'metrics', 'validations', 'high_level_requirements', 'risks',
+                  'assumptions', 'possible_solutions', 'affected_services', 'decision_log']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-input'}),
+            'title': forms.TextInput(attrs={'class': 'form-input'}),
+            'start_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
+            'end_date': forms.DateInput(attrs={'class': 'form-input', 'type': 'date'}, format='%Y-%m-%d'),
+            'objective': forms.Select(attrs={'class': 'form-input'}),
+        }
+
+    def __init__(self, *args, team=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._team = team
+        f = self.fields['objective']
+        f.queryset = _team_objectives(team)
+        f.required = False
+        f.label = 'OKR related to'
+        f.empty_label = 'Choose from existing OKRs'
+        # Every remaining text field is a canvas textarea.
+        for name in self.fields:
+            if name not in ('name', 'title', 'start_date', 'end_date', 'objective'):
+                self.fields[name].widget = forms.Textarea(attrs={'class': 'form-input', 'rows': 3})
+                self.fields[name].required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get('start_date'), cleaned.get('end_date')
+        if start and end and end < start:
+            self.add_error('end_date', 'End date must be after the start date.')
+        return cleaned

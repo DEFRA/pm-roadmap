@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views, api, views_okr, views_team
+from . import views, api, views_okr, views_team, views_experiments, views_prd
 
 app_name = 'roadmap'
 
@@ -34,6 +34,16 @@ urlpatterns = [
     path('teams/<int:pk>/edit/', views_team.team_edit, name='team_edit'),
     path('teams/<int:pk>/sets/new/', views_team.team_set_create, name='team_set_create'),
     path('teams/<int:pk>/roadmaps/new/', views_team.team_roadmap_create, name='team_roadmap_create'),
+
+    # ── Experiment canvases ──
+    path('teams/<int:pk>/experiments/new/', views_experiments.experiment_create, name='experiment_create'),
+    path('teams/<int:pk>/experiments/<int:experiment_pk>/', views_experiments.experiment_detail, name='experiment_detail'),
+    path('teams/<int:pk>/experiments/<int:experiment_pk>/delete/', views_experiments.experiment_delete, name='experiment_delete'),
+
+    # ── PRD canvases ──
+    path('teams/<int:pk>/prds/new/', views_prd.prd_create, name='prd_create'),
+    path('teams/<int:pk>/prds/<int:prd_pk>/', views_prd.prd_detail, name='prd_detail'),
+    path('teams/<int:pk>/prds/<int:prd_pk>/delete/', views_prd.prd_delete, name='prd_delete'),
 
     path('<int:pk>/tree/', views.roadmap_tree, name='tree'),
     path('<int:pk>/', views.roadmap_detail, name='detail'),
